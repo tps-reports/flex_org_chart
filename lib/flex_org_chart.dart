@@ -10,6 +10,7 @@ export 'src/model/connection.dart';
 export 'src/model/geometry.dart';
 export 'src/model/org_chart_data_exception.dart';
 export 'src/model/org_node.dart';
+export 'src/widgets/connection_painter.dart' show ConnectionStyle;
 export 'src/widgets/edge_painter.dart' show LinkStyle;
 export 'src/widgets/expand_button.dart' show DefaultExpandButton;
 export 'src/widgets/org_chart.dart';

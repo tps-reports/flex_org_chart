@@ -8,6 +8,7 @@ import '../model/geometry.dart';
 import '../model/org_chart_data_exception.dart';
 import '../model/org_node.dart';
 import 'chart_viewport.dart';
+import 'connection_painter.dart';
 import 'edge_painter.dart';
 import 'expand_button.dart';
 import 'viewport_math.dart';
@@ -40,6 +41,7 @@ class OrgChart<T> extends StatefulWidget {
       color: Color(0xFFE27396),
       width: 3,
     ),
+    this.connectionStyle = const ConnectionStyle(),
     this.expandButtonBuilder,
     this.onNodeTap,
     this.onExpandToggle,
@@ -78,6 +80,12 @@ class OrgChart<T> extends StatefulWidget {
   /// Color/width of connector lines whose child node is highlighted or on
   /// the highlighted path. Painted on top of regular links.
   final LinkStyle highlightedLinkStyle;
+
+  /// Color/width/dash pattern for the dashed, labeled, arrow-headed arcs
+  /// drawn between arbitrary node pairs declared via
+  /// [OrgChartController.connections] — independent of the hierarchical
+  /// parent/child links styled by [linkStyle]/[highlightedLinkStyle].
+  final ConnectionStyle connectionStyle;
 
   /// Overrides the default expand/collapse affordance rendered under nodes
   /// that have children. Receives a `toggle` callback that flips the
@@ -474,6 +482,22 @@ class _OrgChartState<T> extends State<OrgChart<T>>
                 origin: origin,
                 highlightedChildIds: highlighted,
                 highlightedStyle: widget.highlightedLinkStyle,
+              ),
+            ),
+          ),
+          // Connections (Task 12) are computed from the *current* (next)
+          // state's rects only — unlike EdgePainter's parent/child links,
+          // they don't lerp from `previousState` during a layout-change
+          // animation. They simply snap to the endpoints' new positions
+          // once those positions update; that's an accepted v1 limitation
+          // (see task brief), not an oversight.
+          Positioned.fill(
+            child: CustomPaint(
+              painter: ConnectionPainter(
+                connections: controller.connections,
+                state: state,
+                style: widget.connectionStyle,
+                origin: origin,
               ),
             ),
           ),
