@@ -106,8 +106,9 @@ class OrgChartController<T> extends ChangeNotifier {
   /// visible parent-child link, and the overall bounds.
   ChartState<T> get state => _state;
 
-  /// The layout as of just before the most recent change — used by the
-  /// rendering widget to animate between the two.
+  /// The layout as of just before the most recent LAYOUT change — used by the
+  /// rendering widget to animate between the two. Highlight-only updates do not
+  /// advance it; the animation layer lerps from it.
   ChartState<T> get previousState => _previousState;
 
   /// The error from the most recent failed [setData]/construction, or
@@ -375,7 +376,6 @@ class OrgChartController<T> extends ChangeNotifier {
   void _relayout({bool notify = true}) {
     final config = _config;
     if (config == null) {
-      _previousState = _state;
       return;
     }
     final tree = _tree;

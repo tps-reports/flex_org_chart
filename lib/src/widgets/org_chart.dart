@@ -221,6 +221,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     _layoutAnim.duration = widget.animationDuration;
     _configure();
     if (controllerChanged) {
+      // A configure() from the incoming controller may have started a no-op animation.
+      _layoutAnim.stop();
       // New controller: start fresh rather than animating from whatever the
       // old controller's last snapshot happened to be.
       _animPrev = widget.controller.state;
