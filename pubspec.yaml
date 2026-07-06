@@ -19,8 +19,16 @@ screenshots:
     path: doc/screenshot.png
 
 environment:
-  sdk: ">=3.4.0 <4.0.0"
-  flutter: ">=3.22.0"
+  sdk: ">=3.8.0 <4.0.0"
+  # lib/src/widgets/{viewport_math,org_chart,chart_viewport}.dart call
+  # Matrix4.translateByDouble/scaleByDouble, which vector_math only added in
+  # 2.2.0. Flutter pins vector_math transitively (via package:flutter's own
+  # pubspec) and only started pinning >=2.2.0 as of the 3.35.0 stable release
+  # (commit c08e9dff686 "Manually update vector_math package", landed
+  # 2025-05-28; the first stable tag containing it is 3.35.0 — the prior
+  # stable, 3.32.8, still pins vector_math 2.1.4). Anything below 3.35.0
+  # resolves vector_math 2.1.4 and fails to compile this package.
+  flutter: ">=3.35.0"
 
 dependencies:
   flutter:
@@ -33,5 +41,7 @@ dev_dependencies:
   # Already ships transitively with the Flutter SDK (via `flutter`'s own use
   # of Matrix4/Vector3); declared explicitly only so viewport_math_test.dart
   # can import Vector3 without tripping `depend_on_referenced_packages`. Not
-  # a new dependency in the resolution graph — see task-9-brief.md.
-  vector_math: ^2.1.4
+  # a new dependency in the resolution graph — see task-9-brief.md. Must be
+  # >=2.2.0 to match the Matrix4.translateByDouble/scaleByDouble APIs used
+  # under lib/ (see the `flutter:` constraint comment above).
+  vector_math: ^2.2.0
