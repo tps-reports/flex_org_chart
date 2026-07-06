@@ -15,3 +15,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  # Already ships transitively with the Flutter SDK (via `flutter`'s own use
+  # of Matrix4/Vector3); declared explicitly only so viewport_math_test.dart
+  # can import Vector3 without tripping `depend_on_referenced_packages`. Not
+  # a new dependency in the resolution graph — see task-9-brief.md.
+  vector_math: ^2.1.4

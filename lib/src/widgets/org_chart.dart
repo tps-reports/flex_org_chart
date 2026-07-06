@@ -3,22 +3,25 @@ import 'package:flutter/material.dart';
 import '../controller/org_chart_controller.dart';
 import '../layout/layout_engine.dart';
 import '../layout/layout_orientation.dart';
+import '../model/geometry.dart';
 import '../model/org_chart_data_exception.dart';
 import '../model/org_node.dart';
+import 'chart_viewport.dart';
 import 'edge_painter.dart';
 import 'expand_button.dart';
+import 'viewport_math.dart';
 
 typedef NodeWidgetBuilder<T> = Widget Function(BuildContext, OrgNode<T>);
 
 /// Renders an [OrgChartController]'s current [ChartState] as a Flutter
 /// widget tree.
 ///
-/// This widget is **static** for now: it lays out node widgets and edges in
-/// a [Stack] sized to the chart's layout bounds, with no viewport transform
-/// (pan/zoom — Task 9) and no animated repositioning (Task 11). Every
-/// visible node from `controller.state.nodes` is rendered as an absolutely
-/// positioned child so later tasks can wrap this same content in a
-/// transformed/animated viewport without changing this widget's structure.
+/// The chart content (a [Stack] of positioned node widgets and edges, sized
+/// to the chart's layout bounds) is rendered inside a [ChartViewport], which
+/// supplies pinch/drag pan and scroll-wheel zoom and lets this widget expose
+/// [OrgChartController]'s imperative `fit`/`centerNode`/`zoomIn`/`zoomOut`
+/// calls by implementing [ChartViewportHandle]. Node repositioning itself is
+/// still unanimated (Task 11).
 class OrgChart<T> extends StatefulWidget {
   const OrgChart({
     super.key,
@@ -35,6 +38,8 @@ class OrgChart<T> extends StatefulWidget {
     this.animationDuration = const Duration(milliseconds: 400),
     this.errorBuilder,
     this.emptyBuilder,
+    this.scaleExtent = const (0.001, 20.0),
+    this.onZoom,
   });
 
   /// Owns the chart's data and derived layout. Must be [configure]d by this
@@ -86,19 +91,52 @@ class OrgChart<T> extends StatefulWidget {
   /// Overrides the default view shown when there are no nodes to display.
   final WidgetBuilder? emptyBuilder;
 
+  /// `(min, max)` scale the viewport can be pinched/scrolled/zoomed to.
+  /// Also clamps [OrgChartController.zoomIn]/[OrgChartController.zoomOut].
+  final (double, double) scaleExtent;
+
+  /// Called after every gesture- or scroll-driven zoom with the new scale.
+  /// Programmatic zoom (`zoomIn`/`zoomOut`/`fit`/`centerNode`) does not call
+  /// this — observe [controller] if you need to react to those too.
+  final void Function(double scale)? onZoom;
+
   @override
   State<OrgChart<T>> createState() => _OrgChartState<T>();
 }
 
-class _OrgChartState<T> extends State<OrgChart<T>> {
+class _OrgChartState<T> extends State<OrgChart<T>>
+    with TickerProviderStateMixin
+    implements ChartViewportHandle {
   static ({double w, double h}) _defaultSize<T>(OrgNode<T> _) =>
       (w: 250.0, h: 150.0);
+
+  final TransformationController _tc = TransformationController();
+
+  // Constructed eagerly in initState (not as a `late final` field
+  // initializer) on purpose: `late final` defers construction to first
+  // *access*, and if fitBounds/centerOn are never called with
+  // `animate: true` before this widget is disposed, that first access would
+  // otherwise happen inside dispose() itself (`_viewportAnim.dispose()`).
+  // AnimationController's constructor calls `vsync.createTicker`, which
+  // looks up a TickerMode ancestor via the element tree — something that
+  // throws "Looking up a deactivated widget's ancestor is unsafe" once the
+  // widget is being torn down. Constructing it up front in initState, while
+  // the element is still active, avoids that entirely.
+  late final AnimationController _viewportAnim;
+  Size _viewportSize = Size.zero;
+
+  /// Set once, cleared the first time [build] runs with a non-empty
+  /// [ChartState] — schedules the one-time initial `fit` (see [build]).
+  bool _needsInitialFit = true;
 
   @override
   void initState() {
     super.initState();
+    _viewportAnim = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 400));
     _configure();
     widget.controller.addListener(_onChanged);
+    widget.controller.attachViewport(this);
   }
 
   @override
@@ -106,7 +144,10 @@ class _OrgChartState<T> extends State<OrgChart<T>> {
     super.didUpdateWidget(old);
     if (!identical(old.controller, widget.controller)) {
       old.controller.removeListener(_onChanged);
+      old.controller.detachViewport(this);
       widget.controller.addListener(_onChanged);
+      widget.controller.attachViewport(this);
+      _needsInitialFit = true;
     }
     _configure();
   }
@@ -114,7 +155,81 @@ class _OrgChartState<T> extends State<OrgChart<T>> {
   @override
   void dispose() {
     widget.controller.removeListener(_onChanged);
+    widget.controller.detachViewport(this);
+    _tc.dispose();
+    _viewportAnim.dispose();
     super.dispose();
+  }
+
+  // ---- ChartViewportHandle ----
+
+  /// Drives [_tc] from its current value to [target] over
+  /// [_viewportAnim]'s duration, or jumps immediately when `animate: false`.
+  ///
+  /// Restarting mid-flight (calling this again before the previous tween
+  /// finishes) is safe: `reset()` stops the running ticker, which resolves
+  /// the previous `forward()` call's `TickerFuture` as cancelled and fires
+  /// its `whenCompleteOrCancel` — removing that tween's listener — before
+  /// the new tween's listener is attached below. `begin` is read from
+  /// `_tc.value` *after* that reset, i.e. wherever the in-flight animation
+  /// had ticked to, so retargeting mid-flight continues smoothly instead of
+  /// jumping back to the old animation's start.
+  void _animateTo(Matrix4 target, {bool animate = true}) {
+    if (!animate) {
+      _tc.value = target;
+      return;
+    }
+    final tween = Matrix4Tween(begin: _tc.value.clone(), end: target)
+        .chain(CurveTween(curve: Curves.easeInOut));
+    void tick() => _tc.value = tween.evaluate(_viewportAnim);
+    _viewportAnim
+      ..reset()
+      ..addListener(tick)
+      ..forward().whenCompleteOrCancel(() => _viewportAnim.removeListener(tick));
+  }
+
+  @override
+  void fitBounds(LayoutRect bounds, {bool animate = true}) => _animateTo(
+      fitTransform(bounds: _shifted(bounds), viewport: _viewportSize),
+      animate: animate);
+
+  @override
+  void centerOn(LayoutRect rect, {bool animate = true}) => _animateTo(
+      centerTransform(
+          rect: _shifted(rect),
+          viewport: _viewportSize,
+          scale: _tc.value.getMaxScaleOnAxis()),
+      animate: animate);
+
+  @override
+  void zoomBy(double factor) {
+    final center = Offset(_viewportSize.width / 2, _viewportSize.height / 2);
+    // Same zoom-at-point math as ChartViewport's scroll-wheel handler
+    // (_ChartViewportState._applyScaleAt), anchored at the viewport center
+    // instead of the cursor since there's no pointer position to anchor to
+    // for a programmatic zoomIn()/zoomOut() call.
+    final current = _tc.value.getMaxScaleOnAxis();
+    final target =
+        (current * factor).clamp(widget.scaleExtent.$1, widget.scaleExtent.$2);
+    final applied = target / current;
+    _tc.value = Matrix4.identity()
+      ..translateByDouble(center.dx, center.dy, 0.0, 1.0)
+      ..scaleByDouble(applied, applied, applied, 1.0)
+      ..translateByDouble(-center.dx, -center.dy, 0.0, 1.0)
+      ..multiply(_tc.value);
+  }
+
+  /// [ChartState] rects are in raw layout-bounds space (origin at
+  /// `state.bounds.left/top`, no reserve). Content is actually rendered
+  /// shifted by [_kExpandButtonOverflowReserve] / 2 downward (see [build])
+  /// so the expand-button overflow reserve is symmetric top/bottom. Every
+  /// rect handed to viewport math must go through this so `fit`/`centerNode`
+  /// target the position nodes are actually painted at, not their raw model
+  /// coordinates.
+  LayoutRect _shifted(LayoutRect r) {
+    final b = widget.controller.state.bounds;
+    return LayoutRect(r.left - b.left,
+        r.top - b.top + _kExpandButtonOverflowReserve / 2, r.width, r.height);
   }
 
   void _configure() {
@@ -165,7 +280,23 @@ class _OrgChartState<T> extends State<OrgChart<T>> {
           const Center(child: Text('No data to display'));
     }
 
-    final origin = Offset(-state.bounds.left, -state.bounds.top);
+    // Schedule the one-time initial fit exactly once, the first time this
+    // build sees a non-empty chart. Deferred to a post-frame callback
+    // because `_viewportSize` (read by fitBounds -> fitTransform) is only
+    // known once LayoutBuilder below has run for this frame.
+    if (_needsInitialFit) {
+      _needsInitialFit = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final freshState = widget.controller.state;
+        if (freshState.nodes.isNotEmpty) {
+          fitBounds(freshState.bounds, animate: false);
+        }
+      });
+    }
+
+    final origin = Offset(
+        -state.bounds.left, -state.bounds.top + _kExpandButtonOverflowReserve / 2);
     final children = <Widget>[
       Positioned.fill(
         child: CustomPaint(
@@ -205,24 +336,48 @@ class _OrgChartState<T> extends State<OrgChart<T>> {
       ],
     ];
 
-    return SizedBox(
+    final content = SizedBox(
       width: state.bounds.width,
-      // Reserve headroom below the laid-out bounds for the expand-button
-      // overlay, which this task always anchors to the bottom edge of a
-      // node's rect (see the Positioned above). Flutter's hit-testing gates
-      // every ancestor RenderBox at its own `size` before recursing into
-      // children, so a child painted outside that size — even with
-      // clipBehavior: Clip.none, which only affects *painting* — is visible
-      // but never receives taps. Without this reserve, the expand button on
-      // any bottom-most visible node with children sits partially outside
-      // `state.bounds` and becomes untappable. `_kExpandButtonOverflowReserve`
-      // comfortably covers the default button's ~12px overflow (and
-      // reasonably-sized custom expandButtonBuilder overlays); it does not
-      // depend on measuring the actual button, since Positioned can't query
-      // a child's size before it's laid out.
+      // Reserve headroom above *and* below the laid-out bounds for the
+      // expand-button overlay, which this widget always anchors to the
+      // bottom edge of a node's rect (see the Positioned above). Flutter's
+      // hit-testing gates every ancestor RenderBox at its own `size` before
+      // recursing into children — true even here, inside ChartViewport's
+      // Transform/OverflowBox, since RenderTransform.hitTest inverts the
+      // transform and then still checks its (child's) reported `size`
+      // before delegating. So a child painted outside that size — even
+      // with clipBehavior: Clip.none, which only affects *painting* — is
+      // visible but never receives taps. Verified by a widget test that
+      // taps a bottom-row expand button through the full ChartViewport
+      // composition (viewport_test.dart).
+      //
+      // The reserve is split evenly top/bottom rather than added only
+      // below (as an earlier draft did) even though only the bottom side
+      // ever actually overflows: a bottom-only reserve makes this SizedBox
+      // taller without growing symmetrically around its content, which is
+      // a footgun for any future code that centers this box by its own
+      // size. Splitting the padding keeps the content vertically centered
+      // in its own box regardless. `_shifted` (used by fit/centerNode) adds
+      // the same top half back in, so viewport navigation still targets
+      // rendered node positions, not raw model coordinates.
+      //
+      // The 40px total comfortably covers the default button's ~12px
+      // overflow and reasonably-sized custom expandButtonBuilder overlays;
+      // it does not depend on measuring the actual button, since Positioned
+      // can't query a child's size before it's laid out.
       height: state.bounds.height + _kExpandButtonOverflowReserve,
       child: Stack(clipBehavior: Clip.none, children: children),
     );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      _viewportSize = constraints.biggest;
+      return ChartViewport(
+        transformationController: _tc,
+        scaleExtent: widget.scaleExtent,
+        onZoom: widget.onZoom,
+        child: content,
+      );
+    });
   }
 }
 
