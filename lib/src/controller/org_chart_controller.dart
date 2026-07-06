@@ -194,15 +194,20 @@ class OrgChartController<T> extends ChangeNotifier {
       _requireViewport.fitBounds(_state.bounds, animate: animate);
 
   /// Centers the viewport on [id]. If any ancestor of [id] is collapsed
-  /// (so the node isn't currently visible), its ancestor chain is expanded
-  /// first — "center on this node" should reveal it, not silently no-op.
+  /// (so the node isn't currently visible), the ancestor chain is expanded
+  /// directly first — "center on this node" should reveal it, not silently
+  /// no-op. The target node's own expanded flag is left untouched: revealing
+  /// a node is not the same as expanding it.
   void centerNode(String id,
       {bool withDescendants = false, bool animate = true}) {
     final v = _requireViewport;
     final node = _tree?.nodeById(id);
     if (node == null) return;
     if (node.ancestors.any((a) => !a.isExpanded)) {
-      setExpanded(id, expanded: node.isExpanded, expandAncestors: true);
+      for (final a in node.ancestors) {
+        a.isExpanded = true;
+      }
+      _relayout();
     }
     final layout = _state.byId(id);
     if (layout == null) return;

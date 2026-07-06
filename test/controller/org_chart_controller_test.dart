@@ -26,6 +26,23 @@ const rows = <Row>[
   (id: 'd', parentId: 'c'),
 ];
 
+class FakeViewportHandle implements ChartViewportHandle {
+  final List<LayoutRect> fitBoundsCalls = [];
+  final List<LayoutRect> centerOnCalls = [];
+  final List<double> zoomByCalls = [];
+
+  @override
+  void fitBounds(LayoutRect bounds, {bool animate = true}) =>
+      fitBoundsCalls.add(bounds);
+
+  @override
+  void centerOn(LayoutRect rect, {bool animate = true}) =>
+      centerOnCalls.add(rect);
+
+  @override
+  void zoomBy(double factor) => zoomByCalls.add(factor);
+}
+
 void main() {
   test('initialExpandLevel=1 shows root and its children only', () {
     final c = make(rows);
@@ -86,5 +103,23 @@ void main() {
     final c = make(rows);
     expect(() => c.fit(), throwsStateError);
     expect(() => c.centerNode('a'), throwsStateError);
+  });
+
+  test('centerNode reveals a hidden node by expanding its ancestors', () {
+    final c = make(rows); // initialExpandLevel 1: only a, b visible
+    final handle = FakeViewportHandle();
+    c.attachViewport(handle);
+    expect(c.state.byId('d'), isNull); // hidden before the call
+
+    c.centerNode('d', animate: false);
+
+    expect(c.state.byId('d'), isNotNull); // revealed, not a silent no-op
+    expect(handle.centerOnCalls, hasLength(1));
+    expect(handle.fitBoundsCalls, isEmpty);
+    // Reveal != expand: the target's own expanded flag stays false.
+    expect(c.nodeById('d')!.isExpanded, isFalse);
+
+    c.centerNode('d', withDescendants: true, animate: false);
+    expect(handle.fitBoundsCalls, hasLength(1));
   });
 }
