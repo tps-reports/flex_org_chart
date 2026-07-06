@@ -70,8 +70,17 @@ class OrgChart<T> extends StatefulWidget {
   /// subtrees.
   final bool compact;
 
-  /// Returns the on-screen size to reserve for a node. Defaults to a fixed
-  /// 250x150 box.
+  /// Returns the size to reserve for a node, called during layout — before
+  /// [nodeBuilder] runs. The returned size becomes a hard width/height
+  /// constraint on the rendered node widget (each node is placed in a
+  /// [Positioned] of exactly this size): if [nodeBuilder] produces content
+  /// larger than this, it will overflow or clip silently.
+  ///
+  /// Unlike [nodeBuilder], this callback has no [BuildContext] — it cannot
+  /// depend on Theme, MediaQuery, or inherited widgets. Derive sizes from
+  /// the node's data instead (e.g. taller cards for managers).
+  ///
+  /// Defaults to a constant 250x150 box for every node.
   final ({double w, double h}) Function(OrgNode<T>)? nodeSize;
 
   /// Spacing constants fed to the layout engine.

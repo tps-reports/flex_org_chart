@@ -29,7 +29,15 @@ class OrgChartConfig<T> {
   /// Spacing constants for the layout engine.
   final ChartSpacing spacing;
 
-  /// Returns the on-screen size to reserve for a given node.
+  /// Returns the size to reserve for a node, consumed by the layout engine
+  /// before any node widget is built. The returned size determines the
+  /// node's rect in the computed [ChartState], which the rendering widget
+  /// then applies as a hard width/height constraint on the node's widget —
+  /// content larger than this overflows or clips silently.
+  ///
+  /// This callback runs outside the widget layer (no `BuildContext`), so it
+  /// cannot depend on Theme, MediaQuery, or inherited widgets; derive sizes
+  /// from the node's data instead (e.g. taller cards for managers).
   final ({double w, double h}) Function(OrgNode<T>) nodeSize;
 }
 
