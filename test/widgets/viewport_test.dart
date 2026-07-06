@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flex_org_chart/flex_org_chart.dart';
+import 'package:flex_org_chart/src/widgets/chart_viewport.dart';
 
 typedef Row = ({String id, String? parentId});
 
@@ -136,5 +137,93 @@ void main() {
     c.centerNode('c');
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('instant jump mid-animation cancels the in-flight tween',
+      (tester) async {
+    final c = OrgChartController<Row>(
+        data: const [
+          (id: 'a', parentId: null),
+          (id: 'b', parentId: 'a'),
+          (id: 'c', parentId: 'a'),
+        ],
+        idOf: (r) => r.id,
+        parentIdOf: (r) => r.parentId);
+    await tester.pumpWidget(MaterialApp(
+      home: SizedBox(
+        width: 800,
+        height: 600,
+        child: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          nodeBuilder: (_, n) => Text('node-${n.id}'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final tc = tester
+        .widget<ChartViewport>(find.byType(ChartViewport))
+        .transformationController;
+    // Start an animated pan/zoom, interrupt it mid-flight with an instant
+    // jump, then pump one more frame: the transform must stay pinned at the
+    // instant target — the old tween's tick listener must not keep firing
+    // and drag it back onto the abandoned trajectory.
+    c.centerNode('b'); // animate: true (default), 400ms
+    await tester.pump(const Duration(milliseconds: 50)); // mid-flight
+    c.centerNode('c', animate: false); // instant jump
+    final target = tc.value.clone();
+    await tester.pump(const Duration(milliseconds: 16)); // one frame later
+    expect(tc.value, equals(target),
+        reason: 'the in-flight animated tween must be stopped by an '
+            'animate: false jump; its tick listener must not overwrite '
+            'the instant target on subsequent frames');
+    await tester.pumpAndSettle();
+    expect(tc.value, equals(target));
+  });
+
+  testWidgets('user drag gesture mid-animation cancels the in-flight tween',
+      (tester) async {
+    final c = OrgChartController<Row>(
+        data: const [
+          (id: 'a', parentId: null),
+          (id: 'b', parentId: 'a'),
+          (id: 'c', parentId: 'a'),
+        ],
+        idOf: (r) => r.id,
+        parentIdOf: (r) => r.parentId);
+    await tester.pumpWidget(MaterialApp(
+      home: SizedBox(
+        width: 800,
+        height: 600,
+        child: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          nodeBuilder: (_, n) => Text('node-${n.id}'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final tc = tester
+        .widget<ChartViewport>(find.byType(ChartViewport))
+        .transformationController;
+    // Start an animated fit, then begin dragging mid-flight. Once the drag
+    // has applied, further frames (with the finger held still) must not
+    // change the transform — with the bug, the still-running tween keeps
+    // ticking and overwrites the gesture's matrix every frame.
+    c.centerNode('c'); // animate: true, 400ms
+    await tester.pump(const Duration(milliseconds: 50)); // mid-flight
+    final gesture = await tester
+        .startGesture(tester.getCenter(find.byType(ChartViewport)));
+    await gesture.moveBy(const Offset(60, 40)); // past touch slop -> pan
+    await tester.pump();
+    final afterDrag = tc.value.clone();
+    await tester.pump(const Duration(milliseconds: 16)); // finger held still
+    expect(tc.value, equals(afterDrag),
+        reason: 'starting a user gesture must stop the in-flight viewport '
+            'animation; the old tween must not fight the drag');
+    await gesture.up();
+    await tester.pumpAndSettle();
   });
 }

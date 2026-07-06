@@ -15,6 +15,7 @@ class ChartViewport extends StatefulWidget {
     required this.transformationController,
     this.scaleExtent = const (0.001, 20.0),
     this.onZoom,
+    this.onInteractionStart,
   });
 
   final Widget child;
@@ -31,6 +32,13 @@ class ChartViewport extends StatefulWidget {
 
   /// Called after every gesture- or scroll-driven zoom with the new scale.
   final void Function(double scale)? onZoom;
+
+  /// Called when the user starts interacting with the viewport — at the
+  /// start of a pinch/drag gesture and before each scroll-wheel/trackpad
+  /// zoom step. The owning widget uses this to stop any in-flight
+  /// programmatic viewport animation so its tween doesn't keep ticking and
+  /// fight the user's gesture for control of [transformationController].
+  final VoidCallback? onInteractionStart;
 
   @override
   State<ChartViewport> createState() => _ChartViewportState();
@@ -105,6 +113,7 @@ class _ChartViewportState extends State<ChartViewport> {
     return Listener(
       onPointerSignal: (event) {
         if (event is PointerScrollEvent) {
+          widget.onInteractionStart?.call();
           final factor = event.scrollDelta.dy < 0 ? 1.1 : 1 / 1.1;
           _applyScaleAt(factor, event.localPosition);
         }
@@ -112,6 +121,11 @@ class _ChartViewportState extends State<ChartViewport> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onScaleStart: (details) {
+          // Must run before the transform snapshot below: stopping an
+          // in-flight programmatic animation may not change _tc.value, but
+          // ordering it first guarantees the snapshot is taken from a
+          // matrix that nothing else is about to overwrite.
+          widget.onInteractionStart?.call();
           _gestureStart = _tc.value.clone();
           _focalStart = details.localFocalPoint;
         },

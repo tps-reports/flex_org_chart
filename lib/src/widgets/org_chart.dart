@@ -166,15 +166,23 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   /// Drives [_tc] from its current value to [target] over
   /// [_viewportAnim]'s duration, or jumps immediately when `animate: false`.
   ///
-  /// Restarting mid-flight (calling this again before the previous tween
-  /// finishes) is safe: `reset()` stops the running ticker, which resolves
-  /// the previous `forward()` call's `TickerFuture` as cancelled and fires
-  /// its `whenCompleteOrCancel` — removing that tween's listener — before
-  /// the new tween's listener is attached below. `begin` is read from
-  /// `_tc.value` *after* that reset, i.e. wherever the in-flight animation
-  /// had ticked to, so retargeting mid-flight continues smoothly instead of
-  /// jumping back to the old animation's start.
+  /// Any in-flight animation is stopped first, in *both* branches: `stop()`
+  /// cancels the running ticker, which resolves the previous `forward()`
+  /// call's `TickerFuture` as cancelled and fires its `whenCompleteOrCancel`
+  /// — removing that tween's tick listener. Without the up-front stop, the
+  /// `animate: false` branch would set `_tc.value` once but leave the old
+  /// tween's listener attached to a still-running controller, which would
+  /// keep firing and silently drag the transform back onto the abandoned
+  /// trajectory for up to the remaining animation duration (regression:
+  /// 'instant jump mid-animation cancels the in-flight tween' in
+  /// viewport_test.dart).
+  ///
+  /// For the animated branch this also makes mid-flight retargeting clean:
+  /// `begin` is read from `_tc.value` *after* the stop, i.e. wherever the
+  /// interrupted animation had ticked to, so retargeting continues smoothly
+  /// instead of jumping back to the old animation's start.
   void _animateTo(Matrix4 target, {bool animate = true}) {
+    _viewportAnim.stop();
     if (!animate) {
       _tc.value = target;
       return;
@@ -375,6 +383,11 @@ class _OrgChartState<T> extends State<OrgChart<T>>
         transformationController: _tc,
         scaleExtent: widget.scaleExtent,
         onZoom: widget.onZoom,
+        // A user gesture takes over the transform: cancel any in-flight
+        // programmatic fit/center animation so its tween doesn't keep
+        // ticking and fight the gesture (stop() fires the tween's
+        // whenCompleteOrCancel, detaching its tick listener).
+        onInteractionStart: () => _viewportAnim.stop(),
         child: content,
       );
     });
