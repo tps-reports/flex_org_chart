@@ -32,6 +32,10 @@ class OrgChart<T> extends StatefulWidget {
     this.nodeSize,
     this.spacing = const ChartSpacing(),
     this.linkStyle = const LinkStyle(),
+    this.highlightedLinkStyle = const LinkStyle(
+      color: Color(0xFFE27396),
+      width: 3,
+    ),
     this.expandButtonBuilder,
     this.onNodeTap,
     this.onExpandToggle,
@@ -66,6 +70,10 @@ class OrgChart<T> extends StatefulWidget {
 
   /// Color/width of the connector lines drawn between parent and child.
   final LinkStyle linkStyle;
+
+  /// Color/width of connector lines whose child node is highlighted or on
+  /// the highlighted path. Painted on top of regular links.
+  final LinkStyle highlightedLinkStyle;
 
   /// Overrides the default expand/collapse affordance rendered under nodes
   /// that have children. Receives a `toggle` callback that flips the
@@ -311,11 +319,27 @@ class _OrgChartState<T> extends State<OrgChart<T>>
 
     final origin = Offset(
         -state.bounds.left, -state.bounds.top + _kExpandButtonOverflowReserve / 2);
+
+    // Compute the set of node IDs that are highlighted or on the highlighted path.
+    // Only include nodes that have a parent (i.e., are not roots), since root nodes
+    // have no incoming link to highlight.
+    final highlighted = <String>{
+      for (final n in state.nodes)
+        if ((n.node.isHighlighted || n.node.isOnHighlightedPath) &&
+            n.node.parent != null)
+          n.node.id,
+    };
+
     final children = <Widget>[
       Positioned.fill(
         child: CustomPaint(
           painter: EdgePainter(
-              links: state.links, style: widget.linkStyle, origin: origin),
+            links: state.links,
+            style: widget.linkStyle,
+            origin: origin,
+            highlightedChildIds: highlighted,
+            highlightedStyle: widget.highlightedLinkStyle,
+          ),
         ),
       ),
       for (final layout in state.nodes) ...[
