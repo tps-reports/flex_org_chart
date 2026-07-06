@@ -343,12 +343,25 @@ class OrgChartController<T> extends ChangeNotifier {
     return true;
   }
 
+  // Only advances `_previousState` when the freshly computed state actually
+  // differs in layout from the current `_state` (see
+  // `ChartState.layoutDiffers`, shared with the `OrgChart` widget's own
+  // animation-restart guard). Without this check, every call here —
+  // including highlight-only changes and every `configure()` triggered by a
+  // widget rebuild — would overwrite `_previousState` with a
+  // structurally-identical `_state`, and the widget's `_mergedNodes()`
+  // (which reads `previousState`/`state` live) would then lerp between two
+  // identical states: any in-flight layout animation snaps to its end
+  // position instantly on the very next notify, even though the widget's
+  // own guard correctly declined to restart the animation.
   void _relayout({bool notify = true}) {
     final config = _config;
-    _previousState = _state;
-    if (config == null) return;
+    if (config == null) {
+      _previousState = _state;
+      return;
+    }
     final tree = _tree;
-    _state = (tree == null)
+    final newState = (tree == null)
         ? ChartState.empty<T>()
         : LayoutEngine.compute<T>(
             tree: tree,
@@ -358,6 +371,10 @@ class OrgChartController<T> extends ChangeNotifier {
             spacing: config.spacing,
             nodeSize: config.nodeSize,
           );
+    if (ChartState.layoutDiffers(_state, newState)) {
+      _previousState = _state;
+    }
+    _state = newState;
     if (notify) notifyListeners();
   }
 }

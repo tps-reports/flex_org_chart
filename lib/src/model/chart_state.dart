@@ -61,4 +61,33 @@ class ChartState<T> {
   /// data has been laid out.
   static ChartState<T> empty<T>() => ChartState(
       nodes: const [], links: const [], bounds: const LayoutRect(0, 0, 0, 0));
+
+  /// True when animating from [a] to [b] would actually move, add, or
+  /// remove anything visible: a different visible node count, different
+  /// overall [bounds], or a different rect for any node id present in both.
+  /// Highlight/expansion flags on individual [OrgNode]s are deliberately not
+  /// considered — they don't affect layout, so a highlight-only change
+  /// should not be treated as a layout change.
+  ///
+  /// This is the single source of truth for "did the layout change" —
+  /// shared by [OrgChartController] (to decide whether to advance
+  /// [OrgChartController.previousState]) and the `OrgChart` widget (to
+  /// decide whether to restart its layout-change animation) so the two
+  /// never disagree about what counts as a real change.
+  static bool layoutDiffers<T>(ChartState<T> a, ChartState<T> b) {
+    if (identical(a, b)) return false;
+    if (a.nodes.length != b.nodes.length) return true;
+    if (!_rectEquals(a.bounds, b.bounds)) return true;
+    for (final n in b.nodes) {
+      final prevNode = a.byId(n.node.id);
+      if (prevNode == null || !_rectEquals(prevNode.rect, n.rect)) return true;
+    }
+    return false;
+  }
+
+  static bool _rectEquals(LayoutRect x, LayoutRect y) =>
+      x.left == y.left &&
+      x.top == y.top &&
+      x.width == y.width &&
+      x.height == y.height;
 }

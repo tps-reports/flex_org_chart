@@ -172,6 +172,17 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   late final AnimationController _layoutAnim;
   late final CurvedAnimation _t;
 
+  /// The frozen "from"/"to" pair `_mergedNodes`/the `EdgePainter` animate
+  /// between. Updated only from [_onChanged], and only when it detects a
+  /// *genuine* layout change (see [_onChanged] and the comment on
+  /// `ChartState.layoutDiffers`) — never read live off [widget.controller]
+  /// during a build. See the class-level doc comment on why this snapshot
+  /// exists: without it, an unrelated notify mid-animation (a highlight, or
+  /// an ancestor rebuild re-running `configure()`) would otherwise corrupt
+  /// what "previous" and "next" mean for the *already in-flight* animation.
+  ChartState<T> _animPrev = ChartState.empty<T>();
+  ChartState<T> _animNext = ChartState.empty<T>();
+
   /// Set once, cleared the first time [build] runs with a non-empty
   /// [ChartState] — schedules the one-time initial `fit` (see [build]).
   bool _needsInitialFit = true;
@@ -184,7 +195,14 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     _layoutAnim =
         AnimationController(vsync: this, duration: widget.animationDuration);
     _t = CurvedAnimation(parent: _layoutAnim, curve: Curves.easeInOut);
+    _layoutAnim.addStatusListener(_onLayoutAnimStatus);
     _configure();
+    // Seed the snapshot to the controller's freshly-computed initial state
+    // (rather than leaving it at ChartState.empty) so the very first notify
+    // — even a highlight-only one — isn't mistaken for a "from nothing"
+    // entrance transition by the `_onChanged` guard below.
+    _animPrev = widget.controller.state;
+    _animNext = widget.controller.state;
     widget.controller.addListener(_onChanged);
     widget.controller.attachViewport(this);
   }
@@ -192,7 +210,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   @override
   void didUpdateWidget(OrgChart<T> old) {
     super.didUpdateWidget(old);
-    if (!identical(old.controller, widget.controller)) {
+    final controllerChanged = !identical(old.controller, widget.controller);
+    if (controllerChanged) {
       old.controller.removeListener(_onChanged);
       old.controller.detachViewport(this);
       widget.controller.addListener(_onChanged);
@@ -201,6 +220,25 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     }
     _layoutAnim.duration = widget.animationDuration;
     _configure();
+    if (controllerChanged) {
+      // New controller: start fresh rather than animating from whatever the
+      // old controller's last snapshot happened to be.
+      _animPrev = widget.controller.state;
+      _animNext = widget.controller.state;
+    }
+  }
+
+  /// Once the layout-change animation completes, catch the snapshot back up
+  /// to the controller's live state. Not required for correctness — once
+  /// `t` clamps to 1.0, `_mergedNodes` already renders every surviving
+  /// node at its final (snapshot) rect, which is equal to the live rect —
+  /// but it keeps `_animPrev`/`_animNext` from pinning stale [OrgNode]
+  /// references for longer than necessary and keeps `_layoutChanged`-style
+  /// comparisons trivially reference-equal right after a settle.
+  void _onLayoutAnimStatus(AnimationStatus status) {
+    if (!mounted || status != AnimationStatus.completed) return;
+    _animPrev = widget.controller.state;
+    _animNext = widget.controller.state;
   }
 
   @override
@@ -335,41 +373,40 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   // we still rebuild (setState) to pick up any other state change — e.g. a
   // highlight-only update — but leave `_layoutAnim` alone rather than
   // restarting it.
+  //
+  // The comparison basis matters (Task 13 fix): this deliberately compares
+  // the *fresh* `widget.controller.state` against this widget's own last
+  // accepted snapshot (`_animNext`), not against `widget.controller
+  // .previousState`. `OrgChartController._relayout` now only advances its
+  // own `previousState` when the newly computed state differs from its
+  // *current* `state` — which means `previousState`/`state` stay unequal
+  // for as long as no further *genuine* change happens (there is no ticker
+  // on the controller side to "catch them up" once an animation merely
+  // finishes playing). Comparing those two directly here, on every single
+  // notify, would therefore see "changed" forever after the first real
+  // layout change and restart `_layoutAnim` on every subsequent highlight —
+  // the same bug this guard exists to prevent, just moved one layer up.
+  // Comparing against our own snapshot instead converges correctly: once a
+  // genuine change is accepted, `_animNext` is set to that state, so the
+  // *next* redundant notify compares equal and does nothing.
   void _onChanged() {
     if (!mounted) return;
-    if (_layoutChanged(
-        widget.controller.previousState, widget.controller.state)) {
+    final next = widget.controller.state;
+    if (ChartState.layoutDiffers(_animNext, next)) {
+      // Snapshot *before* mutating _animNext — used as the "from" anchor by
+      // _mergedNodes/EdgePainter for the whole upcoming animation,
+      // regardless of what widget.controller.previousState reads as later.
+      _animPrev = widget.controller.previousState;
+      _animNext = next;
       _layoutAnim.forward(from: 0);
     }
     setState(() {});
   }
 
-  /// Cheap structural comparison of two [ChartState]s using only their
-  /// public API (no changes to lib/src/model/ allowed for this task): true
-  /// when the visible node count, overall bounds, or any surviving node's
-  /// rect differs. Highlight/expansion flags on [OrgNode] are deliberately
-  /// not compared here — they don't affect layout, so a highlight-only
-  /// change should still repaint (via the unconditional setState in
-  /// [_onChanged]) without restarting the position/opacity animation.
-  bool _layoutChanged(ChartState<T> a, ChartState<T> b) {
-    if (identical(a, b)) return false;
-    if (a.nodes.length != b.nodes.length) return true;
-    if (!_rectEquals(a.bounds, b.bounds)) return true;
-    for (final n in b.nodes) {
-      final prevNode = a.byId(n.node.id);
-      if (prevNode == null || !_rectEquals(prevNode.rect, n.rect)) return true;
-    }
-    return false;
-  }
-
-  bool _rectEquals(LayoutRect x, LayoutRect y) =>
-      x.left == y.left &&
-      x.top == y.top &&
-      x.width == y.width &&
-      x.height == y.height;
-
-  /// Merges [OrgChartController.previousState] and [OrgChartController.state]
-  /// into the per-frame node view driving the layout-change animation.
+  /// Merges [_animPrev] and [_animNext] — this widget's own frozen snapshot
+  /// of the layout-change animation's endpoints, *not* a live read of
+  /// [OrgChartController.previousState]/[OrgChartController.state] (see
+  /// [_onChanged]) — into the per-frame node view driving the animation.
   /// Nodes present in both states lerp their rect by the current eased
   /// progress `t`. Nodes only in [next] (just became visible) enter from
   /// their nearest ancestor's *previous* rect — falling all the way back to
@@ -379,8 +416,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   /// fading out (opacity 1→0), until `t` reaches 1 — see [build], which
   /// drops them from the tree once `t >= 1.0`.
   List<_AnimatedNode<T>> _mergedNodes() {
-    final prev = widget.controller.previousState;
-    final next = widget.controller.state;
+    final prev = _animPrev;
+    final next = _animNext;
     final t = _layoutAnim.isAnimating ? _t.value : 1.0;
 
     LayoutRect lerpRect(LayoutRect a, LayoutRect b) => LayoutRect(
@@ -487,8 +524,13 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           Positioned.fill(
             child: CustomPaint(
               painter: EdgePainter(
-                links: state.links,
-                prevLinks: controller.previousState.links,
+                // From the same frozen snapshot _mergedNodes() uses, not a
+                // live read of controller.state/previousState — see
+                // _onChanged's comment on why a live read here would let an
+                // unrelated notify mid-animation corrupt the in-flight
+                // transition's endpoints.
+                links: _animNext.links,
+                prevLinks: _animPrev.links,
                 t: t,
                 style: widget.linkStyle,
                 origin: origin,
