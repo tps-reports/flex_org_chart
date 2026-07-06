@@ -4,10 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flex_org_chart/src/layout/flextree.dart';
 
 void main() {
+  // Select the non-compact fixtures by their `compact` flag rather than by
+  // filename: `leaf-heavy-for-compact.json` and `two-compact-groups.json` are
+  // non-compact fixtures whose names contain "compact" (their compact twins
+  // end in "-compact-compact.json" / "-compact.json"), so no filename filter
+  // can distinguish them reliably.
   final files = Directory('test/fixtures')
       .listSync()
       .whereType<File>()
-      .where((f) => f.path.endsWith('.json') && !f.path.contains('compact'))
+      .where((f) =>
+          f.path.endsWith('.json') &&
+          (jsonDecode(f.readAsStringSync())
+                  as Map<String, dynamic>)['compact'] ==
+              false)
       .toList()
     ..sort((a, b) => a.path.compareTo(b.path));
 
