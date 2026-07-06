@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../controller/org_chart_controller.dart';
 import '../layout/layout_engine.dart';
 import '../layout/layout_orientation.dart';
+import '../model/chart_state.dart';
 import '../model/geometry.dart';
 import '../model/org_chart_data_exception.dart';
 import '../model/org_node.dart';
@@ -20,8 +21,11 @@ typedef NodeWidgetBuilder<T> = Widget Function(BuildContext, OrgNode<T>);
 /// to the chart's layout bounds) is rendered inside a [ChartViewport], which
 /// supplies pinch/drag pan and scroll-wheel zoom and lets this widget expose
 /// [OrgChartController]'s imperative `fit`/`centerNode`/`zoomIn`/`zoomOut`
-/// calls by implementing [ChartViewportHandle]. Node repositioning itself is
-/// still unanimated (Task 11).
+/// calls by implementing [ChartViewportHandle]. Whenever the controller's
+/// visible node set or their rects actually change, nodes and links animate
+/// between the old and new layout over [OrgChart.animationDuration]:
+/// entering nodes emerge from their parent's previous position and exiting
+/// nodes retreat into their parent's new position (see [_mergedNodes]).
 class OrgChart<T> extends StatefulWidget {
   const OrgChart({
     super.key,
@@ -88,8 +92,10 @@ class OrgChart<T> extends StatefulWidget {
   /// Called after the built-in expand button toggles a node's expansion.
   final void Function(OrgNode<T>, bool expanded)? onExpandToggle;
 
-  /// Reserved for Task 11 (animated layout transitions); unused by this
-  /// static-rendering implementation.
+  /// Duration of the layout-change animation driven by `_layoutAnim`: nodes
+  /// and links lerp between their previous and current positions/paths over
+  /// this duration whenever the controller's visible node set or rects
+  /// actually change (see `_onChanged`'s guard).
   final Duration animationDuration;
 
   /// Overrides the default error view shown when [controller]'s data is
@@ -133,6 +139,19 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   late final AnimationController _viewportAnim;
   Size _viewportSize = Size.zero;
 
+  // Layout-change animation (Task 11). Constructed eagerly in initState for
+  // the same reason _viewportAnim is (see its comment above): a `late final`
+  // field initializer only constructs on first *access*, and if a layout
+  // change never happens before this widget is disposed, that first access
+  // would otherwise happen inside dispose() itself, throwing when
+  // AnimationController's constructor tries to look up a vsync ancestor of
+  // an already-deactivated element.
+  //
+  // `_t` is the eased (easeInOut) view of `_layoutAnim` that `_mergedNodes`
+  // and the EdgePainter progress both read from.
+  late final AnimationController _layoutAnim;
+  late final CurvedAnimation _t;
+
   /// Set once, cleared the first time [build] runs with a non-empty
   /// [ChartState] — schedules the one-time initial `fit` (see [build]).
   bool _needsInitialFit = true;
@@ -142,6 +161,9 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     super.initState();
     _viewportAnim = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 400));
+    _layoutAnim =
+        AnimationController(vsync: this, duration: widget.animationDuration);
+    _t = CurvedAnimation(parent: _layoutAnim, curve: Curves.easeInOut);
     _configure();
     widget.controller.addListener(_onChanged);
     widget.controller.attachViewport(this);
@@ -157,6 +179,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       widget.controller.attachViewport(this);
       _needsInitialFit = true;
     }
+    _layoutAnim.duration = widget.animationDuration;
     _configure();
   }
 
@@ -166,6 +189,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     widget.controller.detachViewport(this);
     _tc.dispose();
     _viewportAnim.dispose();
+    _t.dispose();
+    _layoutAnim.dispose();
     super.dispose();
   }
 
@@ -201,7 +226,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     _viewportAnim
       ..reset()
       ..addListener(tick)
-      ..forward().whenCompleteOrCancel(() => _viewportAnim.removeListener(tick));
+      ..forward()
+          .whenCompleteOrCancel(() => _viewportAnim.removeListener(tick));
   }
 
   @override
@@ -271,9 +297,105 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   // while it is the active build target, so setState on `this` is in scope.
   // The `mounted` guard is defensive belt-and-braces, not a fix for an
   // observed assertion.
+  //
+  // Ordering trap (Task 11): OrgChartController.configure() reruns
+  // _relayout (and notifies, once initialized) on *every* call, and
+  // didUpdateWidget calls configure() on every widget rebuild — including
+  // rebuilds with no actual data/expansion change (e.g. an ancestor
+  // rebuilding for an unrelated reason). _relayout also unconditionally
+  // allocates a brand-new ChartState each time, so a plain
+  // `identical(controller.state, _lastSeenState)` check can never catch
+  // this: the object reference differs on every single notify, "real"
+  // change or not. If _onChanged blindly restarted `_layoutAnim` on every
+  // notify, an app that rebuilds OrgChart's ancestor frequently would keep
+  // resetting the animation to t=0 forever — nodes mid-transition would
+  // never reach their destination. Instead, only restart when the
+  // *content* actually changed: same node count, same bounds, and same
+  // rect per surviving node id means nothing worth animating happened, so
+  // we still rebuild (setState) to pick up any other state change — e.g. a
+  // highlight-only update — but leave `_layoutAnim` alone rather than
+  // restarting it.
   void _onChanged() {
     if (!mounted) return;
+    if (_layoutChanged(
+        widget.controller.previousState, widget.controller.state)) {
+      _layoutAnim.forward(from: 0);
+    }
     setState(() {});
+  }
+
+  /// Cheap structural comparison of two [ChartState]s using only their
+  /// public API (no changes to lib/src/model/ allowed for this task): true
+  /// when the visible node count, overall bounds, or any surviving node's
+  /// rect differs. Highlight/expansion flags on [OrgNode] are deliberately
+  /// not compared here — they don't affect layout, so a highlight-only
+  /// change should still repaint (via the unconditional setState in
+  /// [_onChanged]) without restarting the position/opacity animation.
+  bool _layoutChanged(ChartState<T> a, ChartState<T> b) {
+    if (identical(a, b)) return false;
+    if (a.nodes.length != b.nodes.length) return true;
+    if (!_rectEquals(a.bounds, b.bounds)) return true;
+    for (final n in b.nodes) {
+      final prevNode = a.byId(n.node.id);
+      if (prevNode == null || !_rectEquals(prevNode.rect, n.rect)) return true;
+    }
+    return false;
+  }
+
+  bool _rectEquals(LayoutRect x, LayoutRect y) =>
+      x.left == y.left &&
+      x.top == y.top &&
+      x.width == y.width &&
+      x.height == y.height;
+
+  /// Merges [OrgChartController.previousState] and [OrgChartController.state]
+  /// into the per-frame node view driving the layout-change animation.
+  /// Nodes present in both states lerp their rect by the current eased
+  /// progress `t`. Nodes only in [next] (just became visible) enter from
+  /// their nearest ancestor's *previous* rect — falling all the way back to
+  /// their own final rect if no ancestor existed before — fading in
+  /// (opacity 0→1). Nodes only in [prev] (just became hidden) are kept
+  /// around and animated toward their nearest ancestor's *next* rect,
+  /// fading out (opacity 1→0), until `t` reaches 1 — see [build], which
+  /// drops them from the tree once `t >= 1.0`.
+  List<_AnimatedNode<T>> _mergedNodes() {
+    final prev = widget.controller.previousState;
+    final next = widget.controller.state;
+    final t = _layoutAnim.isAnimating ? _t.value : 1.0;
+
+    LayoutRect lerpRect(LayoutRect a, LayoutRect b) => LayoutRect(
+        a.left + (b.left - a.left) * t,
+        a.top + (b.top - a.top) * t,
+        a.width + (b.width - a.width) * t,
+        a.height + (b.height - a.height) * t);
+
+    LayoutRect parentRect(ChartState<T> st, OrgNode<T> n, LayoutRect fallback) {
+      var p = n.parent;
+      while (p != null) {
+        final r = st.byId(p.id)?.rect;
+        if (r != null) return r;
+        p = p.parent;
+      }
+      return fallback;
+    }
+
+    final out = <_AnimatedNode<T>>[];
+    for (final n in next.nodes) {
+      final from = prev.byId(n.node.id)?.rect ??
+          parentRect(prev, n.node, n.rect); // enter from parent's old spot
+      out.add(_AnimatedNode(n.node, lerpRect(from, n.rect),
+          opacity: prev.byId(n.node.id) == null ? t : 1.0));
+    }
+    if (t < 1.0) {
+      for (final o in prev.nodes) {
+        if (next.byId(o.node.id) != null) continue;
+        final to =
+            parentRect(next, o.node, o.rect); // exit into parent's new spot
+        out.add(_AnimatedNode(o.node, lerpRect(o.rect, to),
+            opacity: 1.0 - t, exiting: true));
+      }
+    }
+    return out;
   }
 
   void _toggle(OrgNode<T> node) {
@@ -317,8 +439,8 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       });
     }
 
-    final origin = Offset(
-        -state.bounds.left, -state.bounds.top + _kExpandButtonOverflowReserve / 2);
+    final origin = Offset(-state.bounds.left,
+        -state.bounds.top + _kExpandButtonOverflowReserve / 2);
 
     // Compute the set of node IDs that are highlighted or on the highlighted path.
     // Only include nodes that have a parent (i.e., are not roots), since root nodes
@@ -330,49 +452,71 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           n.node.id,
     };
 
-    final children = <Widget>[
-      Positioned.fill(
-        child: CustomPaint(
-          painter: EdgePainter(
-            links: state.links,
-            style: widget.linkStyle,
-            origin: origin,
-            highlightedChildIds: highlighted,
-            highlightedStyle: widget.highlightedLinkStyle,
-          ),
-        ),
-      ),
-      for (final layout in state.nodes) ...[
-        Positioned(
-          key: ValueKey('node-position-${layout.node.id}'),
-          left: layout.rect.left + origin.dx,
-          top: layout.rect.top + origin.dy,
-          width: layout.rect.width,
-          height: layout.rect.height,
-          child: GestureDetector(
-            onTap: widget.onNodeTap == null
-                ? null
-                : () => widget.onNodeTap!(layout.node),
-            child: widget.nodeBuilder(context, layout.node),
-          ),
-        ),
-        if (layout.node.children.isNotEmpty)
-          Positioned(
-            left: layout.rect.left + origin.dx + layout.rect.width / 2 - 20,
-            top: layout.rect.top + origin.dy + layout.rect.height - 8,
-            child: KeyedSubtree(
-              key: ValueKey('expand-button-${layout.node.id}'),
-              child: widget.expandButtonBuilder?.call(
-                      context, layout.node, () => _toggle(layout.node)) ??
-                  DefaultExpandButton(
-                    expanded: layout.node.isExpanded,
-                    count: layout.node.directSubordinates,
-                    onTap: () => _toggle(layout.node),
-                  ),
+    // The whole node/link layer rebuilds every animation frame via this
+    // AnimatedBuilder, which listens to `_t` directly rather than relying on
+    // `_OrgChartState.setState` — that keeps per-tick rebuilds scoped to
+    // this Stack instead of re-running the rest of build() (LayoutBuilder,
+    // origin/highlighted computation, the postFrameCallback check) on every
+    // frame of a layout-change animation.
+    final animatedLayer = AnimatedBuilder(
+      animation: _t,
+      builder: (context, _) {
+        final merged = _mergedNodes();
+        final t = _layoutAnim.isAnimating ? _t.value : 1.0;
+        final children = <Widget>[
+          Positioned.fill(
+            child: CustomPaint(
+              painter: EdgePainter(
+                links: state.links,
+                prevLinks: controller.previousState.links,
+                t: t,
+                style: widget.linkStyle,
+                origin: origin,
+                highlightedChildIds: highlighted,
+                highlightedStyle: widget.highlightedLinkStyle,
+              ),
             ),
           ),
-      ],
-    ];
+          for (final n in merged) ...[
+            Positioned(
+              key: ValueKey('node-position-${n.node.id}'),
+              left: n.rect.left + origin.dx,
+              top: n.rect.top + origin.dy,
+              width: n.rect.width,
+              height: n.rect.height,
+              child: IgnorePointer(
+                ignoring: n.exiting,
+                child: Opacity(
+                  opacity: n.opacity.clamp(0.0, 1.0),
+                  child: GestureDetector(
+                    onTap: widget.onNodeTap == null
+                        ? null
+                        : () => widget.onNodeTap!(n.node),
+                    child: widget.nodeBuilder(context, n.node),
+                  ),
+                ),
+              ),
+            ),
+            if (!n.exiting && n.node.children.isNotEmpty)
+              Positioned(
+                left: n.rect.left + origin.dx + n.rect.width / 2 - 20,
+                top: n.rect.top + origin.dy + n.rect.height - 8,
+                child: KeyedSubtree(
+                  key: ValueKey('expand-button-${n.node.id}'),
+                  child: widget.expandButtonBuilder
+                          ?.call(context, n.node, () => _toggle(n.node)) ??
+                      DefaultExpandButton(
+                        expanded: n.node.isExpanded,
+                        count: n.node.directSubordinates,
+                        onTap: () => _toggle(n.node),
+                      ),
+                ),
+              ),
+          ],
+        ];
+        return Stack(clipBehavior: Clip.none, children: children);
+      },
+    );
 
     final content = SizedBox(
       width: state.bounds.width,
@@ -404,7 +548,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       // it does not depend on measuring the actual button, since Positioned
       // can't query a child's size before it's laid out.
       height: state.bounds.height + _kExpandButtonOverflowReserve,
-      child: Stack(clipBehavior: Clip.none, children: children),
+      child: animatedLayer,
     );
 
     return LayoutBuilder(builder: (context, constraints) {
@@ -426,3 +570,18 @@ class _OrgChartState<T> extends State<OrgChart<T>>
 
 /// See the height comment in [_OrgChartState.build].
 const _kExpandButtonOverflowReserve = 40.0;
+
+/// One frame's worth of a node's animated position, produced by
+/// [_OrgChartState._mergedNodes]. [rect] is already lerped between the
+/// node's previous and current layout rects (or, for entering/exiting
+/// nodes, between/around its parent's rect); [opacity] fades entering nodes
+/// in and exiting nodes out. [exiting] marks a node that only exists in
+/// [OrgChartController.previousState] — still rendered (fading out) until
+/// the animation completes, then dropped.
+class _AnimatedNode<T> {
+  _AnimatedNode(this.node, this.rect, {this.opacity = 1, this.exiting = false});
+  final OrgNode<T> node;
+  final LayoutRect rect;
+  final double opacity;
+  final bool exiting;
+}
