@@ -1,6 +1,21 @@
 import '../model/geometry.dart';
 
-enum ChartLayout { top, bottom, left, right }
+/// The direction an org chart grows in, controlling both which screen axis
+/// depth flows along and where the root is anchored.
+enum ChartLayout {
+  /// Root at the top, children flowing downward (the conventional org
+  /// chart orientation).
+  top,
+
+  /// Root at the bottom, children flowing upward.
+  bottom,
+
+  /// Root at the left, children flowing rightward.
+  left,
+
+  /// Root at the right, children flowing leftward.
+  right,
+}
 
 /// Maps a node's top-space layout position (centerX, topY, w, h)
 /// into screen space for the requested layout direction.

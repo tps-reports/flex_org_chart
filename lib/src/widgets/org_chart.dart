@@ -13,6 +13,7 @@ import 'edge_painter.dart';
 import 'expand_button.dart';
 import 'viewport_math.dart';
 
+/// Builds the widget shown for a single visible node.
 typedef NodeWidgetBuilder<T> = Widget Function(BuildContext, OrgNode<T>);
 
 /// Renders an [OrgChartController]'s current [ChartState] as a Flutter
@@ -26,7 +27,7 @@ typedef NodeWidgetBuilder<T> = Widget Function(BuildContext, OrgNode<T>);
 /// visible node set or their rects actually change, nodes and links animate
 /// between the old and new layout over [OrgChart.animationDuration]:
 /// entering nodes emerge from their parent's previous position and exiting
-/// nodes retreat into their parent's new position (see [_mergedNodes]).
+/// nodes retreat into their parent's new position.
 class OrgChart<T> extends StatefulWidget {
   const OrgChart({
     super.key,
@@ -52,15 +53,17 @@ class OrgChart<T> extends StatefulWidget {
     this.onZoom,
   });
 
-  /// Owns the chart's data and derived layout. Must be [configure]d by this
-  /// widget (done automatically in initState/didUpdateWidget).
+  /// Owns the chart's data and derived layout. Must be configured by this
+  /// widget via [OrgChartController.configure] (done automatically in
+  /// initState/didUpdateWidget).
   final OrgChartController<T> controller;
 
   /// Builds the widget shown for each visible node.
   final NodeWidgetBuilder<T> nodeBuilder;
 
-  /// Direction the tree grows in. Static rendering only supports [top] fully
-  /// tested here, but all four directions are laid out by the engine.
+  /// Direction the tree grows in. All four [ChartLayout] values are
+  /// supported by the layout engine and renderable here; widget-level tests
+  /// in this package focus on [ChartLayout.top].
   final ChartLayout layout;
 
   /// Whether to use the flextree "compact" packing pass for leaf-heavy

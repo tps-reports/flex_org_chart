@@ -7,8 +7,13 @@ import 'path_builder.dart';
 
 /// Visual style for the parent-child connector lines drawn by [EdgePainter].
 class LinkStyle {
+  /// Creates a link style with the given [color] and [width].
   const LinkStyle({this.color = const Color(0xFFCCCCCC), this.width = 1.5});
+
+  /// Stroke color of the connector line.
   final Color color;
+
+  /// Stroke width of the connector line.
   final double width;
 
   @override

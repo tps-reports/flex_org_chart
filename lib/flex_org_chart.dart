@@ -1,3 +1,13 @@
+/// A highly customizable org chart widget for Flutter, ported from
+/// [d3-org-chart](https://github.com/bumbeishvili/org-chart) with a
+/// flextree-based compact layout for leaf-heavy hierarchies.
+///
+/// The core building blocks are [OrgChartController], which owns your data
+/// and expansion/highlight state, and the [OrgChart] widget, which renders
+/// that controller's current layout with pan/zoom, animated transitions,
+/// and a fully custom node builder. See the package README for a
+/// quickstart and the `example/` app for a complete demo exercising every
+/// feature.
 library flex_org_chart;
 
 export 'src/controller/org_chart_controller.dart';

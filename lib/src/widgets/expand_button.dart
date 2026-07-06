@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 /// Default expand/collapse affordance rendered under a node that has
 /// children. Shows the direct-subordinate count and toggles [onTap].
 class DefaultExpandButton extends StatelessWidget {
+  /// Creates the default expand/collapse button.
   const DefaultExpandButton({
     super.key,
     required this.expanded,
@@ -10,8 +11,13 @@ class DefaultExpandButton extends StatelessWidget {
     required this.onTap,
   });
 
+  /// Whether the node's children are currently shown.
   final bool expanded;
+
+  /// Number of direct children, shown next to the icon.
   final int count;
+
+  /// Called when the button is tapped, to flip [expanded].
   final VoidCallback onTap;
 
   @override

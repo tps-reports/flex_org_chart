@@ -7,15 +7,19 @@ import '../model/geometry.dart';
 /// Visual style for the [ConnectionPainter] overlay: dashed arcs drawn
 /// between arbitrary (non-hierarchical) node pairs declared via
 /// [Connection], independent of the parent/child tree painted by
-/// [EdgePainter].
+/// `EdgePainter`.
 class ConnectionStyle {
+  /// Creates a connection style.
   const ConnectionStyle({
     this.color = const Color(0xFFE27396),
     this.width = 3,
     this.dash = const [7, 7],
     this.labelStyle,
   });
+  /// Stroke color for the arc, its arrowhead, and its label's default style.
   final Color color;
+
+  /// Stroke width for the arc and its arrowhead.
   final double width;
 
   /// On/off segment lengths of the dash pattern, in logical pixels.
@@ -23,6 +27,9 @@ class ConnectionStyle {
   /// zero/negative entry cannot be validated here (const constructor) and
   /// falls back to a solid line at paint time instead of dashing.
   final List<double> dash;
+
+  /// Text style for a connection's [Connection.label], if any. Defaults to
+  /// an 11px label in [color] when `null`.
   final TextStyle? labelStyle;
 
   @override

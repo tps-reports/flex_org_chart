@@ -12,15 +12,24 @@ import '../model/org_node.dart';
 /// Immutable snapshot of everything the layout engine needs, handed to
 /// [OrgChartController.configure] by the widget layer on every build.
 class OrgChartConfig<T> {
+  /// Creates a layout configuration snapshot.
   const OrgChartConfig({
     required this.layout,
     required this.compact,
     required this.spacing,
     required this.nodeSize,
   });
+
+  /// Direction the tree grows in.
   final ChartLayout layout;
+
+  /// Whether the compact packing pass is enabled.
   final bool compact;
+
+  /// Spacing constants for the layout engine.
   final ChartSpacing spacing;
+
+  /// Returns the on-screen size to reserve for a given node.
   final ({double w, double h}) Function(OrgNode<T>) nodeSize;
 }
 
@@ -29,8 +38,16 @@ class OrgChartConfig<T> {
 /// navigation calls (`fit`, `centerNode`, `zoomIn`/`zoomOut`) have somewhere
 /// to go.
 abstract class ChartViewportHandle {
+  /// Animates (or, when `animate` is false, jumps) the viewport so [bounds]
+  /// is fully visible, scaled to fit.
   void fitBounds(LayoutRect bounds, {bool animate = true});
+
+  /// Animates (or jumps) the viewport so [rect] is centered, at the current
+  /// zoom level.
   void centerOn(LayoutRect rect, {bool animate = true});
+
+  /// Multiplies the current zoom level by [factor], anchored at the
+  /// viewport's center.
   void zoomBy(double factor);
 }
 
@@ -39,6 +56,11 @@ abstract class ChartViewportHandle {
 /// about widgets or `dart:ui`; the rendering widget (Task 8) observes it and
 /// a [ChartViewportHandle] is attached for viewport delegation (Task 9).
 class OrgChartController<T> extends ChangeNotifier {
+  /// Creates a controller over [data]. [idOf] and [parentIdOf] resolve each
+  /// item's id and parent id (a `null`/empty parent id makes an item a
+  /// root); nodes at [initialExpandLevel] or shallower start expanded; and
+  /// [connections] declares any non-hierarchical links to draw alongside
+  /// the tree.
   OrgChartController({
     required List<T> data,
     required this.idOf,
@@ -48,8 +70,13 @@ class OrgChartController<T> extends ChangeNotifier {
   })  : _data = List.of(data),
         _connections = List.of(connections);
 
+  /// Resolves a data item's unique id.
   final String Function(T) idOf;
+
+  /// Resolves a data item's parent id, or `null`/empty for a root item.
   final String? Function(T) parentIdOf;
+
+  /// Depth (root = 0) at or above which nodes start expanded.
   final int initialExpandLevel;
 
   List<T> _data;
@@ -62,12 +89,29 @@ class OrgChartController<T> extends ChangeNotifier {
   ChartState<T> _previousState = ChartState.empty<T>();
   bool _initialized = false;
 
+  /// The current computed layout: every visible node's rectangle, every
+  /// visible parent-child link, and the overall bounds.
   ChartState<T> get state => _state;
+
+  /// The layout as of just before the most recent change — used by the
+  /// rendering widget to animate between the two.
   ChartState<T> get previousState => _previousState;
+
+  /// The error from the most recent failed [setData]/construction, or
+  /// `null` if the current data is valid.
   OrgChartDataException? get dataError => _dataError;
+
+  /// The declared non-hierarchical connections, as passed to the
+  /// constructor or replaced since.
   List<Connection> get connections => List.unmodifiable(_connections);
+
+  /// The data items backing every currently visible node, in the order
+  /// they appear in [state].
   List<OrgNode<T>> get visibleNodes =>
       _state.nodes.map((n) => n.node).toList();
+
+  /// Looks up a node anywhere in the tree by id (regardless of whether it
+  /// is currently visible), or `null` if no node has that id.
   OrgNode<T>? nodeById(String id) => _tree?.nodeById(id);
 
   // ---- framework wiring (called by the OrgChart widget) ----
@@ -92,8 +136,12 @@ class OrgChartController<T> extends ChangeNotifier {
     _initialized = true;
   }
 
+  /// Registers [viewport] as the target of `fit`/`centerNode`/`zoomIn`/
+  /// `zoomOut`. Called automatically by the `OrgChart` widget.
   void attachViewport(ChartViewportHandle viewport) => _viewport = viewport;
 
+  /// Unregisters [viewport] if it is the currently attached handle
+  /// (no-op otherwise). Called automatically by the `OrgChart` widget.
   void detachViewport(ChartViewportHandle viewport) {
     if (identical(_viewport, viewport)) _viewport = null;
   }
@@ -113,7 +161,12 @@ class OrgChartController<T> extends ChangeNotifier {
 
   // ---- expansion ----
 
+  /// Expands the node with id [id] (shows its direct children), if it
+  /// exists. No-op if [id] is unknown.
   void expand(String id) => _setExpanded(id, true);
+
+  /// Collapses the node with id [id] (hides its descendants), if it
+  /// exists. No-op if [id] is unknown.
   void collapse(String id) => _setExpanded(id, false);
 
   void _setExpanded(String id, bool expanded) {
@@ -140,11 +193,13 @@ class OrgChartController<T> extends ChangeNotifier {
     _relayout();
   }
 
+  /// Expands every node in the tree, making the whole hierarchy visible.
   void expandAll() {
     _forAll((n) => n.isExpanded = true);
     _relayout();
   }
 
+  /// Collapses every node in the tree, hiding everything below the roots.
   void collapseAll() {
     _forAll((n) => n.isExpanded = false);
     _relayout();
@@ -152,6 +207,9 @@ class OrgChartController<T> extends ChangeNotifier {
 
   // ---- highlight ----
 
+  /// Highlights the single node with id [id], clearing any previous
+  /// highlight or highlighted path. Pass `null` to clear the highlight
+  /// entirely (equivalent to [clearHighlights]).
   void highlight(String? id) {
     _forAll((n) {
       n.isHighlighted = n.id == id;
@@ -160,6 +218,10 @@ class OrgChartController<T> extends ChangeNotifier {
     _relayout();
   }
 
+  /// Highlights the node with id [id] and marks every ancestor up to the
+  /// root as being on the highlighted path, clearing any previous
+  /// highlight. Pass `null` to clear the highlight entirely (equivalent to
+  /// [clearHighlights]).
   void highlightPathToRoot(String? id) {
     _forAll((n) {
       n.isHighlighted = false;
@@ -175,6 +237,7 @@ class OrgChartController<T> extends ChangeNotifier {
     _relayout();
   }
 
+  /// Clears any current highlight and highlighted path.
   void clearHighlights() => highlight(null);
 
   // ---- viewport ----
@@ -190,6 +253,10 @@ class OrgChartController<T> extends ChangeNotifier {
     return v;
   }
 
+  /// Zooms/pans the viewport so the entire chart is visible.
+  ///
+  /// Requires an `OrgChart` widget built with this controller to be
+  /// currently mounted (throws [StateError] otherwise).
   void fit({bool animate = true}) =>
       _requireViewport.fitBounds(_state.bounds, animate: animate);
 
@@ -228,7 +295,10 @@ class OrgChartController<T> extends ChangeNotifier {
     v.fitBounds(LayoutRect(l, t, r - l, b - t), animate: animate);
   }
 
+  /// Zooms the viewport in by a fixed step, anchored at its center.
   void zoomIn() => _requireViewport.zoomBy(1.3);
+
+  /// Zooms the viewport out by a fixed step, anchored at its center.
   void zoomOut() => _requireViewport.zoomBy(1 / 1.3);
 
   // ---- internals ----

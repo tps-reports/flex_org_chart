@@ -6,7 +6,11 @@ import 'flextree.dart';
 import 'layout_orientation.dart';
 import 'link_geometry.dart';
 
+/// Spacing constants fed to the flextree/compact layout passes, in logical
+/// pixels.
 class ChartSpacing {
+  /// Creates a spacing configuration. All values default to the same
+  /// constants d3-org-chart uses.
   const ChartSpacing({
     this.siblings = 20,
     this.children = 60,
@@ -14,10 +18,35 @@ class ChartSpacing {
     this.compactPair = 100,
     this.compactBetween = 20,
   });
-  final double siblings, children, neighbour, compactPair, compactBetween;
+
+  /// Gap between two sibling nodes along the breadth axis.
+  final double siblings;
+
+  /// Gap between a node and its children along the depth axis.
+  final double children;
+
+  /// Extra gap between two sibling *subtrees* that don't share a parent
+  /// within the same level (flextree's neighbour spacing).
+  final double neighbour;
+
+  /// Gap between the two nodes forming a compact-mode pair.
+  final double compactPair;
+
+  /// Gap between successive compact-mode pairs/columns.
+  final double compactBetween;
 }
 
+/// Computes a chart's full layout — node rectangles, parent-child link
+/// paths, and overall bounds — from a stratified tree and the current
+/// display parameters (layout direction, compact mode, spacing, node sizes).
+///
+/// This is the pure, Flutter-free core used by `OrgChartController`: given
+/// the same inputs it always produces the same [ChartState].
 class LayoutEngine {
+  /// Runs the full layout pipeline: builds the visible flextree forest,
+  /// optionally applies the compact-mode packing pass, runs the flextree
+  /// algorithm, orients results into screen space for [layout], and derives
+  /// link paths and overall bounds.
   static ChartState<T> compute<T>({
     required OrgTree<T> tree,
     required bool Function(OrgNode<T>) isVisible,

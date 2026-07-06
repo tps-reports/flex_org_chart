@@ -7,8 +7,13 @@ sealed class PathCommand {
   const PathCommand();
 }
 
+/// Moves the current point to `(x, y)` without drawing, equivalent to SVG's
+/// `M` command.
 class MoveTo extends PathCommand {
+  /// Creates a move-to command targeting `(x, y)`.
   const MoveTo(this.x, this.y);
+
+  /// Target coordinates.
   final double x, y;
   @override
   bool operator ==(Object other) =>
@@ -19,8 +24,13 @@ class MoveTo extends PathCommand {
   String toString() => 'MoveTo($x, $y)';
 }
 
+/// Draws a straight line from the current point to `(x, y)`, equivalent to
+/// SVG's `L` command.
 class LineTo extends PathCommand {
+  /// Creates a line-to command targeting `(x, y)`.
   const LineTo(this.x, this.y);
+
+  /// Target coordinates.
   final double x, y;
   @override
   bool operator ==(Object other) =>
@@ -31,9 +41,20 @@ class LineTo extends PathCommand {
   String toString() => 'LineTo($x, $y)';
 }
 
+/// Draws a cubic Bézier curve from the current point to `(x, y)` using
+/// control points `(x1, y1)` and `(x2, y2)`, equivalent to SVG's `C` command.
 class CubicTo extends PathCommand {
+  /// Creates a cubic-curve command with the given control and end points.
   const CubicTo(this.x1, this.y1, this.x2, this.y2, this.x, this.y);
-  final double x1, y1, x2, y2, x, y;
+
+  /// First control point.
+  final double x1, y1;
+
+  /// Second control point.
+  final double x2, y2;
+
+  /// End coordinates.
+  final double x, y;
   @override
   bool operator ==(Object other) =>
       other is CubicTo &&

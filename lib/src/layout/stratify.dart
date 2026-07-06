@@ -1,6 +1,12 @@
 import '../model/org_chart_data_exception.dart';
 import '../model/org_node.dart';
 
+/// Builds an [OrgTree] from a flat list of data items by resolving each
+/// item's id ([idOf]) and parent id ([parentIdOf]) into parent/child links.
+///
+/// Throws [OrgChartDataException] if [data] is empty, contains duplicate
+/// ids, references a parent id that isn't present in [data], or forms a
+/// cycle.
 OrgTree<T> stratify<T>({
   required List<T> data,
   required String Function(T) idOf,
