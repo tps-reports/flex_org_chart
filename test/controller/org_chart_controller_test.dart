@@ -99,6 +99,27 @@ void main() {
     expect(c.state.nodes, isEmpty);
   });
 
+  test('empty data is an empty state, not a dataError', () {
+    final c = make(const []);
+    expect(c.dataError, isNull);
+    expect(c.state.nodes, isEmpty);
+  });
+
+  test('setData([]) clears a previous chart to an empty state with no '
+      'dataError, and a later non-empty setData brings the chart back', () {
+    final c = make(rows);
+    expect(c.state.nodes, isNotEmpty);
+
+    c.setData(const []);
+    expect(c.dataError, isNull);
+    expect(c.state.nodes, isEmpty);
+
+    c.setData(rows);
+    expect(c.dataError, isNull);
+    expect(c.state.nodes, isNotEmpty);
+    expect(c.visibleNodes.map((n) => n.id), unorderedEquals(['a', 'b']));
+  });
+
   test('viewport methods throw StateError when no chart attached', () {
     final c = make(rows);
     expect(() => c.fit(), throwsStateError);

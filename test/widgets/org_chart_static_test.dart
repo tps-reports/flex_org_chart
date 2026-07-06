@@ -69,4 +69,52 @@ void main() {
     expect(find.textContaining('missing parent'), findsOneWidget);
     expect(find.textContaining('x'), findsWidgets);
   });
+
+  testWidgets('empty data renders the default empty state, not the error view',
+      (tester) async {
+    final c = makeController(const []);
+    await tester.pumpWidget(app(c));
+    await tester.pumpAndSettle();
+    expect(find.text('No data to display'), findsOneWidget);
+    expect(find.textContaining('Could not build org chart'), findsNothing);
+  });
+
+  testWidgets('empty data renders a custom emptyBuilder when provided',
+      (tester) async {
+    final c = makeController(const []);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          nodeBuilder: (context, node) => Text('node-${node.id}'),
+          emptyBuilder: (context) => const Text('Nothing to show yet'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Nothing to show yet'), findsOneWidget);
+    expect(find.text('No data to display'), findsNothing);
+  });
+
+  testWidgets(
+      'setData([]) after non-empty data shows the empty state, and a '
+      'later non-empty setData brings the chart back', (tester) async {
+    final c = makeController();
+    await tester.pumpWidget(app(c));
+    await tester.pumpAndSettle();
+    expect(find.text('node-a'), findsOneWidget);
+
+    c.setData(const []);
+    await tester.pumpAndSettle();
+    expect(find.text('No data to display'), findsOneWidget);
+    expect(find.textContaining('Could not build org chart'), findsNothing);
+    expect(find.text('node-a'), findsNothing);
+
+    c.setData(rows);
+    await tester.pumpAndSettle();
+    expect(find.text('node-a'), findsOneWidget);
+    expect(find.text('No data to display'), findsNothing);
+  });
 }

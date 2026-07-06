@@ -322,6 +322,15 @@ class OrgChartController<T> extends ChangeNotifier {
   void _rebuildTreeIfNeeded() {
     if (_tree != null || _config == null) return;
     _dataError = null;
+    // Empty data is an empty *state*, not an error: `stratify` throwing on
+    // empty input is the right behavior for its own direct callers (it's
+    // tested that way), but this controller has a dedicated empty state —
+    // `state.nodes.isEmpty` with no [dataError] — for the widget layer to
+    // render via `emptyBuilder`. Skip stratify entirely rather than let its
+    // exception surface as [dataError]; `_tree` stays null so `_relayout`
+    // falls through to `ChartState.empty`, exactly like the error path
+    // below, but without setting [dataError].
+    if (_data.isEmpty) return;
     try {
       _tree = stratify<T>(data: _data, idOf: idOf, parentIdOf: parentIdOf);
     } on OrgChartDataException catch (e) {
