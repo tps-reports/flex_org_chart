@@ -1,0 +1,17 @@
+name: flex_org_chart
+description: Highly customizable org chart for Flutter with flextree-based compact layout. Ported from d3-org-chart.
+version: 0.1.0
+repository: https://github.com/mhunter/flex_org_chart
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
