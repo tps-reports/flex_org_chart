@@ -1,0 +1,109 @@
+{
+  "name": "two-compact-groups",
+  "compact": false,
+  "params": {
+    "siblingsMargin": 20,
+    "childrenMargin": 60,
+    "neighbourMargin": 80,
+    "compactMarginBetween": 20,
+    "compactMarginPair": 100
+  },
+  "nodes": [
+    {
+      "id": "r",
+      "parentId": null,
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "a",
+      "parentId": "r",
+      "width": 250,
+      "height": 150,
+      "x": -595,
+      "y": 210
+    },
+    {
+      "id": "b",
+      "parentId": "r",
+      "width": 250,
+      "height": 150,
+      "x": 595,
+      "y": 210
+    },
+    {
+      "id": "a0",
+      "parentId": "a",
+      "width": 200,
+      "height": 120,
+      "x": -1035,
+      "y": 420
+    },
+    {
+      "id": "a1",
+      "parentId": "a",
+      "width": 200,
+      "height": 120,
+      "x": -815,
+      "y": 420
+    },
+    {
+      "id": "a2",
+      "parentId": "a",
+      "width": 200,
+      "height": 120,
+      "x": -595,
+      "y": 420
+    },
+    {
+      "id": "a3",
+      "parentId": "a",
+      "width": 200,
+      "height": 120,
+      "x": -375,
+      "y": 420
+    },
+    {
+      "id": "a4",
+      "parentId": "a",
+      "width": 200,
+      "height": 120,
+      "x": -155,
+      "y": 420
+    },
+    {
+      "id": "b0",
+      "parentId": "b",
+      "width": 260,
+      "height": 100,
+      "x": 175,
+      "y": 420
+    },
+    {
+      "id": "b1",
+      "parentId": "b",
+      "width": 260,
+      "height": 100,
+      "x": 455,
+      "y": 420
+    },
+    {
+      "id": "b2",
+      "parentId": "b",
+      "width": 260,
+      "height": 100,
+      "x": 735,
+      "y": 420
+    },
+    {
+      "id": "b3",
+      "parentId": "b",
+      "width": 260,
+      "height": 100,
+      "x": 1015,
+      "y": 420
+    }
+  ]
+}

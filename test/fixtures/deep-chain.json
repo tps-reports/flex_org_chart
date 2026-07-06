@@ -1,0 +1,53 @@
+{
+  "name": "deep-chain",
+  "compact": false,
+  "params": {
+    "siblingsMargin": 20,
+    "childrenMargin": 60,
+    "neighbourMargin": 80,
+    "compactMarginBetween": 20,
+    "compactMarginPair": 100
+  },
+  "nodes": [
+    {
+      "id": "a",
+      "parentId": null,
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "b",
+      "parentId": "a",
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 210
+    },
+    {
+      "id": "c",
+      "parentId": "b",
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 420
+    },
+    {
+      "id": "d",
+      "parentId": "c",
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 630
+    },
+    {
+      "id": "e",
+      "parentId": "d",
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 840
+    }
+  ]
+}

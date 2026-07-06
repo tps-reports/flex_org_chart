@@ -1,0 +1,101 @@
+{
+  "name": "leaf-heavy-for-compact",
+  "compact": false,
+  "params": {
+    "siblingsMargin": 20,
+    "childrenMargin": 60,
+    "neighbourMargin": 80,
+    "compactMarginBetween": 20,
+    "compactMarginPair": 100
+  },
+  "nodes": [
+    {
+      "id": "r",
+      "parentId": null,
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "m",
+      "parentId": "r",
+      "width": 250,
+      "height": 150,
+      "x": -580,
+      "y": 210
+    },
+    {
+      "id": "k",
+      "parentId": "r",
+      "width": 250,
+      "height": 150,
+      "x": 580,
+      "y": 210
+    },
+    {
+      "id": "l0",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -1390,
+      "y": 420
+    },
+    {
+      "id": "l1",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -1120,
+      "y": 420
+    },
+    {
+      "id": "l2",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -850,
+      "y": 420
+    },
+    {
+      "id": "l3",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -580,
+      "y": 420
+    },
+    {
+      "id": "l4",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -310,
+      "y": 420
+    },
+    {
+      "id": "l5",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": -40,
+      "y": 420
+    },
+    {
+      "id": "l6",
+      "parentId": "m",
+      "width": 250,
+      "height": 150,
+      "x": 230,
+      "y": 420
+    },
+    {
+      "id": "k1",
+      "parentId": "k",
+      "width": 250,
+      "height": 150,
+      "x": 580,
+      "y": 420
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "single-node",
+  "compact": false,
+  "params": {
+    "siblingsMargin": 20,
+    "childrenMargin": 60,
+    "neighbourMargin": 80,
+    "compactMarginBetween": 20,
+    "compactMarginPair": 100
+  },
+  "nodes": [
+    {
+      "id": "a",
+      "parentId": null,
+      "width": 250,
+      "height": 150,
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

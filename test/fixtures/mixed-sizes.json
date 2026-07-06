@@ -1,0 +1,53 @@
+{
+  "name": "mixed-sizes",
+  "compact": false,
+  "params": {
+    "siblingsMargin": 20,
+    "childrenMargin": 60,
+    "neighbourMargin": 80,
+    "compactMarginBetween": 20,
+    "compactMarginPair": 100
+  },
+  "nodes": [
+    {
+      "id": "a",
+      "parentId": null,
+      "width": 300,
+      "height": 100,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "b",
+      "parentId": "a",
+      "width": 100,
+      "height": 260,
+      "x": -120,
+      "y": 160
+    },
+    {
+      "id": "c",
+      "parentId": "a",
+      "width": 220,
+      "height": 140,
+      "x": 60,
+      "y": 160
+    },
+    {
+      "id": "d",
+      "parentId": "b",
+      "width": 180,
+      "height": 90,
+      "x": -200,
+      "y": 480
+    },
+    {
+      "id": "e",
+      "parentId": "b",
+      "width": 140,
+      "height": 200,
+      "x": -20,
+      "y": 480
+    }
+  ]
+}
