@@ -190,12 +190,14 @@ class OrgChartController<T> extends ChangeNotifier {
     return v;
   }
 
-  void fit() => _requireViewport.fitBounds(_state.bounds);
+  void fit({bool animate = true}) =>
+      _requireViewport.fitBounds(_state.bounds, animate: animate);
 
   /// Centers the viewport on [id]. If any ancestor of [id] is collapsed
   /// (so the node isn't currently visible), its ancestor chain is expanded
   /// first — "center on this node" should reveal it, not silently no-op.
-  void centerNode(String id, {bool withDescendants = false}) {
+  void centerNode(String id,
+      {bool withDescendants = false, bool animate = true}) {
     final v = _requireViewport;
     final node = _tree?.nodeById(id);
     if (node == null) return;
@@ -205,7 +207,7 @@ class OrgChartController<T> extends ChangeNotifier {
     final layout = _state.byId(id);
     if (layout == null) return;
     if (!withDescendants) {
-      v.centerOn(layout.rect);
+      v.centerOn(layout.rect, animate: animate);
       return;
     }
     var l = layout.rect.left, t = layout.rect.top;
@@ -218,7 +220,7 @@ class OrgChartController<T> extends ChangeNotifier {
       if (dl.right > r) r = dl.right;
       if (dl.bottom > b) b = dl.bottom;
     }
-    v.fitBounds(LayoutRect(l, t, r - l, b - t));
+    v.fitBounds(LayoutRect(l, t, r - l, b - t), animate: animate);
   }
 
   void zoomIn() => _requireViewport.zoomBy(1.3);
