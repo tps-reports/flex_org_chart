@@ -226,4 +226,46 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
   });
+
+  testWidgets('zoomIn mid-animation cancels the in-flight tween',
+      (tester) async {
+    final c = OrgChartController<Row>(
+        data: const [
+          (id: 'a', parentId: null),
+          (id: 'b', parentId: 'a'),
+          (id: 'c', parentId: 'a'),
+        ],
+        idOf: (r) => r.id,
+        parentIdOf: (r) => r.parentId);
+    await tester.pumpWidget(MaterialApp(
+      home: SizedBox(
+        width: 800,
+        height: 600,
+        child: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          nodeBuilder: (_, n) => Text('node-${n.id}'),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final tc = tester
+        .widget<ChartViewport>(find.byType(ChartViewport))
+        .transformationController;
+    // Start an animated pan/zoom, then zoomIn() mid-flight: the zoom must
+    // stick — with the bug, zoomBy writes _tc.value but leaves the tween
+    // running, and its tick listener wipes the zoom back onto the old
+    // trajectory on the very next frame.
+    c.centerNode('b'); // animate: true (default), 400ms
+    await tester.pump(const Duration(milliseconds: 50)); // mid-flight
+    c.zoomIn(); // zoomBy(1.3), applied instantly
+    final target = tc.value.clone();
+    await tester.pump(const Duration(milliseconds: 16)); // one frame later
+    expect(tc.value, equals(target),
+        reason: 'zoomBy must stop the in-flight viewport animation; the '
+            'old tween must not wipe out the zoom on subsequent frames');
+    await tester.pumpAndSettle();
+    expect(tc.value, equals(target));
+  });
 }

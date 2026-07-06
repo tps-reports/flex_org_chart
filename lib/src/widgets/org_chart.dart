@@ -211,6 +211,12 @@ class _OrgChartState<T> extends State<OrgChart<T>>
 
   @override
   void zoomBy(double factor) {
+    // Like _animateTo and ChartViewport's onInteractionStart: this writes
+    // _tc.value directly, so any in-flight fit/center tween must be stopped
+    // first or its still-attached tick listener wipes the zoom back onto
+    // the abandoned trajectory on the very next frame (regression: 'zoomIn
+    // mid-animation cancels the in-flight tween' in viewport_test.dart).
+    _viewportAnim.stop();
     final center = Offset(_viewportSize.width / 2, _viewportSize.height / 2);
     // Same zoom-at-point math as ChartViewport's scroll-wheel handler
     // (_ChartViewportState._applyScaleAt), anchored at the viewport center
