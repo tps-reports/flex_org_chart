@@ -18,6 +18,11 @@ dependencies:
 
 ## Quickstart
 
+`OrgChartController` is caller-owned — create and keep it (e.g. as a
+`State` field) wherever you own the chart's data, and call `dispose()` on
+it yourself when you're done, as the example app does; the `OrgChart`
+widget below only observes and drives it.
+
 ```dart
 import 'package:flutter/material.dart';
 import 'package:flex_org_chart/flex_org_chart.dart';

@@ -63,6 +63,11 @@ abstract class ChartViewportHandle {
 /// [ChartState] layout. This is a plain [ChangeNotifier] — it knows nothing
 /// about widgets or `dart:ui`; the rendering widget (Task 8) observes it and
 /// a [ChartViewportHandle] is attached for viewport delegation (Task 9).
+///
+/// Caller-owned: create and keep it wherever you own the chart's data (e.g.
+/// a `State` field), and call [dispose] yourself once you're done with it —
+/// the `OrgChart` widget observes and drives an already-constructed
+/// controller, it never takes ownership of or disposes one on your behalf.
 class OrgChartController<T> extends ChangeNotifier {
   /// Creates a controller over [data]. [idOf] and [parentIdOf] resolve each
   /// item's id and parent id (a `null`/empty parent id makes an item a
@@ -110,11 +115,12 @@ class OrgChartController<T> extends ChangeNotifier {
   OrgChartDataException? get dataError => _dataError;
 
   /// The declared non-hierarchical connections, as passed to the
-  /// constructor or replaced since.
+  /// constructor.
   List<Connection> get connections => List.unmodifiable(_connections);
 
-  /// The data items backing every currently visible node, in the order
-  /// they appear in [state].
+  /// The [OrgNode] wrapping every currently visible node's data, in the
+  /// order they appear in [state]. Each entry's `.data` is the original
+  /// item passed to the constructor/[setData], not the item itself.
   List<OrgNode<T>> get visibleNodes =>
       _state.nodes.map((n) => n.node).toList();
 
@@ -216,8 +222,11 @@ class OrgChartController<T> extends ChangeNotifier {
   // ---- highlight ----
 
   /// Highlights the single node with id [id], clearing any previous
-  /// highlight or highlighted path. Pass `null` to clear the highlight
-  /// entirely (equivalent to [clearHighlights]).
+  /// highlight or highlighted path. Pass `null`, or an [id] that doesn't
+  /// match any node, to clear the highlight entirely (equivalent to
+  /// [clearHighlights]) — there's no separate "unknown id" error or no-op:
+  /// every node's highlight flag is simply recomputed against [id], so one
+  /// that matches nothing highlights nothing.
   void highlight(String? id) {
     _forAll((n) {
       n.isHighlighted = n.id == id;
