@@ -17,6 +17,11 @@ class ConnectionStyle {
   });
   final Color color;
   final double width;
+
+  /// On/off segment lengths of the dash pattern, in logical pixels.
+  /// Entries must be positive; a pattern that is empty or contains a
+  /// zero/negative entry cannot be validated here (const constructor) and
+  /// falls back to a solid line at paint time instead of dashing.
   final List<double> dash;
   final TextStyle? labelStyle;
 
@@ -85,7 +90,19 @@ class ConnectionPainter extends CustomPainter {
   /// zero length (degenerate/coincident endpoints) contributes nothing —
   /// `metric.length == 0` short-circuits the `while (d < metric.length)`
   /// loop immediately, so this never spins or divides by zero.
-  Path _dashed(Path source) {
+  ///
+  /// Invalid dash patterns ([ConnectionStyle.dash] empty, or containing a
+  /// zero/negative entry) fall back to returning [source] unchanged — a
+  /// solid line. ConnectionStyle's const constructor can't validate, and
+  /// without this guard a zero entry makes `d += len` a no-op so the loop
+  /// below never terminates, hanging the render thread on first paint
+  /// (regression tests: 'invalid dash patterns' group in
+  /// connections_test.dart).
+  @visibleForTesting
+  Path dashPath(Path source) {
+    if (style.dash.isEmpty || style.dash.any((len) => len <= 0)) {
+      return source;
+    }
     final out = Path();
     for (final metric in source.computeMetrics()) {
       var d = 0.0;
@@ -119,7 +136,7 @@ class ConnectionPainter extends CustomPainter {
       final arc = Path()
         ..moveTo(s.dx, s.dy)
         ..cubicTo(mid.dx, s.dy, mid.dx, t.dy, t.dx, t.dy);
-      canvas.drawPath(_dashed(arc), paint);
+      canvas.drawPath(dashPath(arc), paint);
       _arrowHead(canvas, arc, paint);
       final label = v.connection.label;
       if (label != null) {
