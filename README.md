@@ -105,4 +105,4 @@ This package ports the layout algorithms and API design of
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[BSD 3-Clause](LICENSE).
