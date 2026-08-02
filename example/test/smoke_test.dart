@@ -4,8 +4,9 @@ import 'package:flex_org_chart/flex_org_chart.dart';
 import 'package:flex_org_chart_example/main.dart';
 
 void main() {
-  testWidgets('demo app starts, renders the chart, and exposes its controls',
-      (tester) async {
+  testWidgets('demo app starts, renders the chart, and exposes its controls', (
+    tester,
+  ) async {
     await tester.pumpWidget(const DemoApp());
     // The initial fit animation and layout-change animation both run on
     // timers; let them settle before asserting on the tree.
@@ -29,28 +30,31 @@ void main() {
     expect(find.byType(Switch), findsOneWidget);
   });
 
-  testWidgets('tapping the compact switch toggles compact mode without throwing',
-      (tester) async {
-    await tester.pumpWidget(const DemoApp());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'tapping the compact switch toggles compact mode without throwing',
+    (tester) async {
+      await tester.pumpWidget(const DemoApp());
+      await tester.pumpAndSettle();
 
-    final switchFinder = find.byType(Switch);
-    expect(switchFinder, findsOneWidget);
+      final switchFinder = find.byType(Switch);
+      expect(switchFinder, findsOneWidget);
 
-    final before = tester.widget<Switch>(switchFinder).value;
-    await tester.tap(switchFinder);
-    await tester.pumpAndSettle();
-    final after = tester.widget<Switch>(switchFinder).value;
-    expect(after, !before);
+      final before = tester.widget<Switch>(switchFinder).value;
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+      final after = tester.widget<Switch>(switchFinder).value;
+      expect(after, !before);
 
-    // Toggle back; still no exceptions, and the chart still renders.
-    await tester.tap(switchFinder);
-    await tester.pumpAndSettle();
-    expect(find.text('Ada Lovelace'), findsOneWidget);
-  });
+      // Toggle back; still no exceptions, and the chart still renders.
+      await tester.tap(switchFinder);
+      await tester.pumpAndSettle();
+      expect(find.text('Ada Lovelace'), findsOneWidget);
+    },
+  );
 
-  testWidgets('expand all / collapse all buttons work without throwing',
-      (tester) async {
+  testWidgets('expand all / collapse all buttons work without throwing', (
+    tester,
+  ) async {
     await tester.pumpWidget(const DemoApp());
     await tester.pumpAndSettle();
 
@@ -65,8 +69,9 @@ void main() {
     expect(find.text('Margaret Hamilton'), findsOneWidget);
   });
 
-  testWidgets('tapping a node highlights its path without throwing',
-      (tester) async {
+  testWidgets('tapping a node highlights its path without throwing', (
+    tester,
+  ) async {
     await tester.pumpWidget(const DemoApp());
     await tester.pumpAndSettle();
 

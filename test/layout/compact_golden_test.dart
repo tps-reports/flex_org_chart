@@ -11,14 +11,20 @@ void main() {
   // safe boundary in general, so the flag is the only reliable signal.
   // (Task 3 lesson: decode each file exactly once and reuse the result,
   // rather than decoding once to filter and again inside the test.)
-  final decoded = Directory('test/fixtures')
-      .listSync()
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.json'))
-      .map((f) => MapEntry(f, jsonDecode(f.readAsStringSync()) as Map<String, dynamic>))
-      .where((e) => e.value['compact'] == true)
-      .toList()
-    ..sort((a, b) => a.key.path.compareTo(b.key.path));
+  final decoded =
+      Directory('test/fixtures')
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.json'))
+          .map(
+            (f) => MapEntry(
+              f,
+              jsonDecode(f.readAsStringSync()) as Map<String, dynamic>,
+            ),
+          )
+          .where((e) => e.value['compact'] == true)
+          .toList()
+        ..sort((a, b) => a.key.path.compareTo(b.key.path));
 
   test('exactly 8 compact fixtures are selected', () {
     expect(decoded.length, 8);
@@ -36,8 +42,10 @@ void main() {
       FlexNode<String>? root;
       for (final r in rows) {
         byId[r['id'] as String] = FlexNode<String>(r['id'] as String);
-        sizes[r['id'] as String] =
-            ((r['width'] as num).toDouble(), (r['height'] as num).toDouble());
+        sizes[r['id'] as String] = (
+          (r['width'] as num).toDouble(),
+          (r['height'] as num).toDouble(),
+        );
       }
       for (final r in rows) {
         final n = byId[r['id']]!;
@@ -80,10 +88,16 @@ void main() {
 
       for (final r in rows) {
         final n = byId[r['id']]!;
-        expect(n.x, closeTo((r['x'] as num).toDouble(), 1e-6),
-            reason: 'x of ${r['id']}');
-        expect(n.y, closeTo((r['y'] as num).toDouble(), 1e-6),
-            reason: 'y of ${r['id']}');
+        expect(
+          n.x,
+          closeTo((r['x'] as num).toDouble(), 1e-6),
+          reason: 'x of ${r['id']}',
+        );
+        expect(
+          n.y,
+          closeTo((r['y'] as num).toDouble(), 1e-6),
+          reason: 'y of ${r['id']}',
+        );
       }
     });
   }

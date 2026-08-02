@@ -9,16 +9,19 @@ void main() {
   // non-compact fixtures whose names contain "compact" (their compact twins
   // end in "-compact-compact.json" / "-compact.json"), so no filename filter
   // can distinguish them reliably.
-  final files = Directory('test/fixtures')
-      .listSync()
-      .whereType<File>()
-      .where((f) =>
-          f.path.endsWith('.json') &&
-          (jsonDecode(f.readAsStringSync())
-                  as Map<String, dynamic>)['compact'] ==
-              false)
-      .toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  final files =
+      Directory('test/fixtures')
+          .listSync()
+          .whereType<File>()
+          .where(
+            (f) =>
+                f.path.endsWith('.json') &&
+                (jsonDecode(f.readAsStringSync())
+                        as Map<String, dynamic>)['compact'] ==
+                    false,
+          )
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
 
   for (final file in files) {
     test('matches d3-flextree: ${file.path}', () {
@@ -30,12 +33,10 @@ void main() {
       FlexNode<String>? root;
       for (final r in rows) {
         final n = FlexNode<String>(r['id'] as String)
-          ..xSize =
-              ((r['width'] as num) + (params['siblingsMargin'] as num))
-                  .toDouble()
-          ..ySize =
-              ((r['height'] as num) + (params['childrenMargin'] as num))
-                  .toDouble();
+          ..xSize = ((r['width'] as num) + (params['siblingsMargin'] as num))
+              .toDouble()
+          ..ySize = ((r['height'] as num) + (params['childrenMargin'] as num))
+              .toDouble();
         byId[r['id'] as String] = n;
       }
       for (final r in rows) {
@@ -56,10 +57,16 @@ void main() {
 
       for (final r in rows) {
         final n = byId[r['id']]!;
-        expect(n.x, closeTo((r['x'] as num).toDouble(), 1e-6),
-            reason: 'x of ${r['id']}');
-        expect(n.y, closeTo((r['y'] as num).toDouble(), 1e-6),
-            reason: 'y of ${r['id']}');
+        expect(
+          n.x,
+          closeTo((r['x'] as num).toDouble(), 1e-6),
+          reason: 'x of ${r['id']}',
+        );
+        expect(
+          n.y,
+          closeTo((r['y'] as num).toDouble(), 1e-6),
+          reason: 'y of ${r['id']}',
+        );
       }
     });
   }

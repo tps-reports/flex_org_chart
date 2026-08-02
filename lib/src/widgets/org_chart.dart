@@ -103,7 +103,7 @@ class OrgChart<T> extends StatefulWidget {
   /// that have children. Receives a `toggle` callback that flips the
   /// node's expanded state through the controller.
   final Widget Function(BuildContext, OrgNode<T>, VoidCallback toggle)?
-      expandButtonBuilder;
+  expandButtonBuilder;
 
   /// Called when a node widget is tapped. When null, node widgets do not
   /// intercept taps (they pass through to whatever is beneath them).
@@ -191,9 +191,13 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   void initState() {
     super.initState();
     _viewportAnim = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 400));
-    _layoutAnim =
-        AnimationController(vsync: this, duration: widget.animationDuration);
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _layoutAnim = AnimationController(
+      vsync: this,
+      duration: widget.animationDuration,
+    );
     _t = CurvedAnimation(parent: _layoutAnim, curve: Curves.easeInOut);
     _layoutAnim.addStatusListener(_onLayoutAnimStatus);
     _configure();
@@ -280,28 +284,34 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       _tc.value = target;
       return;
     }
-    final tween = Matrix4Tween(begin: _tc.value.clone(), end: target)
-        .chain(CurveTween(curve: Curves.easeInOut));
+    final tween = Matrix4Tween(
+      begin: _tc.value.clone(),
+      end: target,
+    ).chain(CurveTween(curve: Curves.easeInOut));
     void tick() => _tc.value = tween.evaluate(_viewportAnim);
     _viewportAnim
       ..reset()
       ..addListener(tick)
-      ..forward()
-          .whenCompleteOrCancel(() => _viewportAnim.removeListener(tick));
+      ..forward().whenCompleteOrCancel(
+        () => _viewportAnim.removeListener(tick),
+      );
   }
 
   @override
   void fitBounds(LayoutRect bounds, {bool animate = true}) => _animateTo(
-      fitTransform(bounds: _shifted(bounds), viewport: _viewportSize),
-      animate: animate);
+    fitTransform(bounds: _shifted(bounds), viewport: _viewportSize),
+    animate: animate,
+  );
 
   @override
   void centerOn(LayoutRect rect, {bool animate = true}) => _animateTo(
-      centerTransform(
-          rect: _shifted(rect),
-          viewport: _viewportSize,
-          scale: _tc.value.getMaxScaleOnAxis()),
-      animate: animate);
+    centerTransform(
+      rect: _shifted(rect),
+      viewport: _viewportSize,
+      scale: _tc.value.getMaxScaleOnAxis(),
+    ),
+    animate: animate,
+  );
 
   @override
   void zoomBy(double factor) {
@@ -317,8 +327,10 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     // instead of the cursor since there's no pointer position to anchor to
     // for a programmatic zoomIn()/zoomOut() call.
     final current = _tc.value.getMaxScaleOnAxis();
-    final target =
-        (current * factor).clamp(widget.scaleExtent.$1, widget.scaleExtent.$2);
+    final target = (current * factor).clamp(
+      widget.scaleExtent.$1,
+      widget.scaleExtent.$2,
+    );
     final applied = target / current;
     _tc.value = Matrix4.identity()
       ..translateByDouble(center.dx, center.dy, 0.0, 1.0)
@@ -336,17 +348,23 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   /// coordinates.
   LayoutRect _shifted(LayoutRect r) {
     final b = widget.controller.state.bounds;
-    return LayoutRect(r.left - b.left,
-        r.top - b.top + _kExpandButtonOverflowReserve / 2, r.width, r.height);
+    return LayoutRect(
+      r.left - b.left,
+      r.top - b.top + _kExpandButtonOverflowReserve / 2,
+      r.width,
+      r.height,
+    );
   }
 
   void _configure() {
-    widget.controller.configure(OrgChartConfig<T>(
-      layout: widget.layout,
-      compact: widget.compact,
-      spacing: widget.spacing,
-      nodeSize: widget.nodeSize ?? _defaultSize,
-    ));
+    widget.controller.configure(
+      OrgChartConfig<T>(
+        layout: widget.layout,
+        compact: widget.compact,
+        spacing: widget.spacing,
+        nodeSize: widget.nodeSize ?? _defaultSize,
+      ),
+    );
   }
 
   // Calling setState() here in response to a controller notification that
@@ -423,10 +441,11 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     final t = _layoutAnim.isAnimating ? _t.value : 1.0;
 
     LayoutRect lerpRect(LayoutRect a, LayoutRect b) => LayoutRect(
-        a.left + (b.left - a.left) * t,
-        a.top + (b.top - a.top) * t,
-        a.width + (b.width - a.width) * t,
-        a.height + (b.height - a.height) * t);
+      a.left + (b.left - a.left) * t,
+      a.top + (b.top - a.top) * t,
+      a.width + (b.width - a.width) * t,
+      a.height + (b.height - a.height) * t,
+    );
 
     LayoutRect parentRect(ChartState<T> st, OrgNode<T> n, LayoutRect fallback) {
       var p = n.parent;
@@ -440,18 +459,33 @@ class _OrgChartState<T> extends State<OrgChart<T>>
 
     final out = <_AnimatedNode<T>>[];
     for (final n in next.nodes) {
-      final from = prev.byId(n.node.id)?.rect ??
+      final from =
+          prev.byId(n.node.id)?.rect ??
           parentRect(prev, n.node, n.rect); // enter from parent's old spot
-      out.add(_AnimatedNode(n.node, lerpRect(from, n.rect),
-          opacity: prev.byId(n.node.id) == null ? t : 1.0));
+      out.add(
+        _AnimatedNode(
+          n.node,
+          lerpRect(from, n.rect),
+          opacity: prev.byId(n.node.id) == null ? t : 1.0,
+        ),
+      );
     }
     if (t < 1.0) {
       for (final o in prev.nodes) {
         if (next.byId(o.node.id) != null) continue;
-        final to =
-            parentRect(next, o.node, o.rect); // exit into parent's new spot
-        out.add(_AnimatedNode(o.node, lerpRect(o.rect, to),
-            opacity: 1.0 - t, exiting: true));
+        final to = parentRect(
+          next,
+          o.node,
+          o.rect,
+        ); // exit into parent's new spot
+        out.add(
+          _AnimatedNode(
+            o.node,
+            lerpRect(o.rect, to),
+            opacity: 1.0 - t,
+            exiting: true,
+          ),
+        );
       }
     }
     return out;
@@ -472,8 +506,10 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Text('Could not build org chart: $error',
-                  textAlign: TextAlign.center),
+              child: Text(
+                'Could not build org chart: $error',
+                textAlign: TextAlign.center,
+              ),
             ),
           );
     }
@@ -498,8 +534,10 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       });
     }
 
-    final origin = Offset(-state.bounds.left,
-        -state.bounds.top + _kExpandButtonOverflowReserve / 2);
+    final origin = Offset(
+      -state.bounds.left,
+      -state.bounds.top + _kExpandButtonOverflowReserve / 2,
+    );
 
     // Compute the set of node IDs that are highlighted or on the highlighted path.
     // Only include nodes that have a parent (i.e., are not roots), since root nodes
@@ -583,8 +621,12 @@ class _OrgChartState<T> extends State<OrgChart<T>>
                 top: n.rect.top + origin.dy + n.rect.height - 8,
                 child: KeyedSubtree(
                   key: ValueKey('expand-button-${n.node.id}'),
-                  child: widget.expandButtonBuilder
-                          ?.call(context, n.node, () => _toggle(n.node)) ??
+                  child:
+                      widget.expandButtonBuilder?.call(
+                        context,
+                        n.node,
+                        () => _toggle(n.node),
+                      ) ??
                       DefaultExpandButton(
                         expanded: n.node.isExpanded,
                         count: n.node.directSubordinates,
@@ -631,20 +673,22 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       child: animatedLayer,
     );
 
-    return LayoutBuilder(builder: (context, constraints) {
-      _viewportSize = constraints.biggest;
-      return ChartViewport(
-        transformationController: _tc,
-        scaleExtent: widget.scaleExtent,
-        onZoom: widget.onZoom,
-        // A user gesture takes over the transform: cancel any in-flight
-        // programmatic fit/center animation so its tween doesn't keep
-        // ticking and fight the gesture (stop() fires the tween's
-        // whenCompleteOrCancel, detaching its tick listener).
-        onInteractionStart: () => _viewportAnim.stop(),
-        child: content,
-      );
-    });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        _viewportSize = constraints.biggest;
+        return ChartViewport(
+          transformationController: _tc,
+          scaleExtent: widget.scaleExtent,
+          onZoom: widget.onZoom,
+          // A user gesture takes over the transform: cancel any in-flight
+          // programmatic fit/center animation so its tween doesn't keep
+          // ticking and fight the gesture (stop() fires the tween's
+          // whenCompleteOrCancel, detaching its tick listener).
+          onInteractionStart: () => _viewportAnim.stop(),
+          child: content,
+        );
+      },
+    );
   }
 }
 

@@ -42,8 +42,10 @@ OrgTree<T> stratify<T>({
     }
   }
   if (orphans.isNotEmpty) {
-    throw OrgChartDataException('Nodes reference missing parent ids',
-        offendingIds: orphans);
+    throw OrgChartDataException(
+      'Nodes reference missing parent ids',
+      offendingIds: orphans,
+    );
   }
   final reachable = <String>{};
   for (final r in roots) {
@@ -52,9 +54,10 @@ OrgTree<T> stratify<T>({
     }
   }
   if (reachable.length != byId.length) {
-    throw OrgChartDataException('Cycle detected in parent references',
-        offendingIds:
-            byId.keys.where((id) => !reachable.contains(id)).toList());
+    throw OrgChartDataException(
+      'Cycle detected in parent references',
+      offendingIds: byId.keys.where((id) => !reachable.contains(id)).toList(),
+    );
   }
   return OrgTree.internal(roots, byId);
 }

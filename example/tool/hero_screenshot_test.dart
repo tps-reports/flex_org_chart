@@ -32,8 +32,9 @@ import 'package:flex_org_chart_example/main.dart';
 /// here is bundled into the package or committed: only the resulting PNG
 /// is, and it never embeds font data.
 void main() {
-  testWidgets('generates doc/screenshot.png from the real demo app',
-      (tester) async {
+  testWidgets('generates doc/screenshot.png from the real demo app', (
+    tester,
+  ) async {
     // Font loading is real async I/O (a platform round-trip into the
     // engine); it must run via runAsync to escape the FakeAsync zone
     // `testWidgets` otherwise runs in, or the await never completes.
@@ -44,22 +45,23 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final boundaryKey = GlobalKey();
-    await tester.pumpWidget(RepaintBoundary(
-      key: boundaryKey,
-      child: const DemoApp(),
-    ));
+    await tester.pumpWidget(
+      RepaintBoundary(key: boundaryKey, child: const DemoApp()),
+    );
     // Let the initial fit + any layout animation finish, then trigger the
     // highlight-path demo so the screenshot shows off highlighting too.
     await tester.pumpAndSettle();
     await tester.tap(find.text('Hedy Lamarr'));
     await tester.pumpAndSettle();
 
-    final boundary = boundaryKey.currentContext!.findRenderObject()
-        as RenderRepaintBoundary;
-    final image =
-        await tester.runAsync(() => boundary.toImage(pixelRatio: 2.0));
+    final boundary =
+        boundaryKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await tester.runAsync(
+      () => boundary.toImage(pixelRatio: 2.0),
+    );
     final bytes = await tester.runAsync(
-        () => image!.toByteData(format: ui.ImageByteFormat.png));
+      () => image!.toByteData(format: ui.ImageByteFormat.png),
+    );
 
     final file = File('${Directory.current.path}/../doc/screenshot.png');
     file.parent.createSync(recursive: true);

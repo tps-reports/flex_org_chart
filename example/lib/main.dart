@@ -142,8 +142,9 @@ class _DemoAppState extends State<DemoApp> {
               onPressed: () {
                 controller.centerNode('11');
                 _setStatus(
-                    'Centered on Hedy Lamarr (expanding collapsed ancestors '
-                    'if needed).');
+                  'Centered on Hedy Lamarr (expanding collapsed ancestors '
+                  'if needed).',
+                );
               },
             ),
             IconButton(
@@ -151,8 +152,10 @@ class _DemoAppState extends State<DemoApp> {
               icon: const Icon(Icons.route),
               onPressed: () {
                 controller.highlightPathToRoot('11');
-                _setStatus('Highlighted the path from the CEO to Hedy '
-                    'Lamarr.');
+                _setStatus(
+                  'Highlighted the path from the CEO to Hedy '
+                  'Lamarr.',
+                );
               },
             ),
             const SizedBox(width: 8),
@@ -169,9 +172,12 @@ class _DemoAppState extends State<DemoApp> {
                 for (final layout in ChartLayout.values)
                   DropdownMenuItem(
                     value: layout,
-                    child: Text(layout.name,
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary)),
+                    child: Text(
+                      layout.name,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -181,9 +187,11 @@ class _DemoAppState extends State<DemoApp> {
               value: _compact,
               onChanged: (value) {
                 setState(() => _compact = value);
-                _setStatus(value
-                    ? 'Compact mode on: leaf-heavy teams fold into columns.'
-                    : 'Compact mode off: every node gets its own row.');
+                _setStatus(
+                  value
+                      ? 'Compact mode on: leaf-heavy teams fold into columns.'
+                      : 'Compact mode off: every node gets its own row.',
+                );
               },
             ),
           ],
@@ -193,15 +201,19 @@ class _DemoAppState extends State<DemoApp> {
             Material(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: Row(
                   children: [
                     const Icon(Icons.info_outline, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(_status,
-                          style: Theme.of(context).textTheme.bodySmall),
+                      child: Text(
+                        _status,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                   ],
                 ),
@@ -216,11 +228,13 @@ class _DemoAppState extends State<DemoApp> {
                 onNodeTap: (node) {
                   controller.highlightPathToRoot(node.id);
                   _setStatus(
-                      'Highlighted the path from the CEO to ${node.data.name}.');
+                    'Highlighted the path from the CEO to ${node.data.name}.',
+                  );
                 },
                 onExpandToggle: (node, expanded) => _setStatus(
-                    '${expanded ? 'Expanded' : 'Collapsed'} '
-                    "${node.data.name}'s team."),
+                  '${expanded ? 'Expanded' : 'Collapsed'} '
+                  "${node.data.name}'s team.",
+                ),
                 onZoom: (scale) =>
                     _setStatus('Zoom: ${scale.toStringAsFixed(2)}x'),
                 connectionStyle: const ConnectionStyle(
@@ -236,8 +250,8 @@ class _DemoAppState extends State<DemoApp> {
                     color: highlighted
                         ? Colors.pink.shade50
                         : onPath
-                            ? Colors.pink.shade100
-                            : null,
+                        ? Colors.pink.shade100
+                        : null,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                       side: highlighted
@@ -253,7 +267,9 @@ class _DemoAppState extends State<DemoApp> {
                           Text(
                             node.data.name,
                             style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -269,10 +285,8 @@ class _DemoAppState extends State<DemoApp> {
                             node.totalSubordinates == 0
                                 ? 'Individual contributor'
                                 : '${node.totalSubordinates} report'
-                                    '${node.totalSubordinates == 1 ? '' : 's'}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
+                                      '${node.totalSubordinates == 1 ? '' : 's'}',
+                            style: Theme.of(context).textTheme.labelSmall
                                 ?.copyWith(color: Colors.black54),
                           ),
                         ],

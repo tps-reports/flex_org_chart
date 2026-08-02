@@ -104,8 +104,9 @@ class EdgePainter extends CustomPainter {
   void _paintLinks(Canvas canvas, List<_AnimatedLink> items, LinkStyle s) {
     for (final item in items) {
       final paint = Paint()
-        ..color = s.color
-            .withValues(alpha: (s.color.a * item.opacity).clamp(0.0, 1.0))
+        ..color = s.color.withValues(
+          alpha: (s.color.a * item.opacity).clamp(0.0, 1.0),
+        )
         ..strokeWidth = s.width
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
@@ -138,7 +139,10 @@ class _AnimatedLink {
 /// violated (length mismatch) — better a visually wrong but valid path than
 /// a crash mid-animation.
 List<PathCommand> _lerpCommands(
-    List<PathCommand> a, List<PathCommand> b, double t) {
+  List<PathCommand> a,
+  List<PathCommand> b,
+  double t,
+) {
   if (a.length != b.length) return b;
   return [for (var i = 0; i < a.length; i++) _lerpCommand(a[i], b[i], t)];
 }
@@ -152,8 +156,14 @@ PathCommand _lerpCommand(PathCommand a, PathCommand b, double t) {
     return LineTo(lerp(a.x, b.x), lerp(a.y, b.y));
   }
   if (a is CubicTo && b is CubicTo) {
-    return CubicTo(lerp(a.x1, b.x1), lerp(a.y1, b.y1), lerp(a.x2, b.x2),
-        lerp(a.y2, b.y2), lerp(a.x, b.x), lerp(a.y, b.y));
+    return CubicTo(
+      lerp(a.x1, b.x1),
+      lerp(a.y1, b.y1),
+      lerp(a.x2, b.x2),
+      lerp(a.y2, b.y2),
+      lerp(a.x, b.x),
+      lerp(a.y, b.y),
+    );
   }
   return b; // shape mismatch: shouldn't happen per the generator contract
 }

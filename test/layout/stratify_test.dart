@@ -4,8 +4,8 @@ import 'package:flex_org_chart/flex_org_chart.dart';
 typedef Row = ({String id, String? parentId});
 Row r(String id, String? p) => (id: id, parentId: p);
 
-OrgTree<Row> build(List<Row> rows) => stratify<Row>(
-    data: rows, idOf: (r) => r.id, parentIdOf: (r) => r.parentId);
+OrgTree<Row> build(List<Row> rows) =>
+    stratify<Row>(data: rows, idOf: (r) => r.id, parentIdOf: (r) => r.parentId);
 
 void main() {
   test('builds single-root tree with correct parent/child wiring', () {
@@ -27,24 +27,35 @@ void main() {
   test('throws on duplicate ids, listing them', () {
     expect(
       () => build([r('a', null), r('a', null)]),
-      throwsA(isA<OrgChartDataException>()
-          .having((e) => e.offendingIds, 'ids', ['a'])),
+      throwsA(
+        isA<OrgChartDataException>().having((e) => e.offendingIds, 'ids', [
+          'a',
+        ]),
+      ),
     );
   });
 
   test('throws on orphaned parentId', () {
     expect(
       () => build([r('a', null), r('b', 'ghost')]),
-      throwsA(isA<OrgChartDataException>()
-          .having((e) => e.offendingIds, 'ids', ['b'])),
+      throwsA(
+        isA<OrgChartDataException>().having((e) => e.offendingIds, 'ids', [
+          'b',
+        ]),
+      ),
     );
   });
 
   test('throws on cycle, listing unreachable ids', () {
     expect(
       () => build([r('a', null), r('b', 'c'), r('c', 'b')]),
-      throwsA(isA<OrgChartDataException>()
-          .having((e) => e.offendingIds, 'ids', containsAll(['b', 'c']))),
+      throwsA(
+        isA<OrgChartDataException>().having(
+          (e) => e.offendingIds,
+          'ids',
+          containsAll(['b', 'c']),
+        ),
+      ),
     );
   });
 

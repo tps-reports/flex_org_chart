@@ -80,8 +80,8 @@ class OrgChartController<T> extends ChangeNotifier {
     required this.parentIdOf,
     this.initialExpandLevel = 1,
     List<Connection> connections = const [],
-  })  : _data = List.of(data),
-        _connections = List.of(connections);
+  }) : _data = List.of(data),
+       _connections = List.of(connections);
 
   /// Resolves a data item's unique id.
   final String Function(T) idOf;
@@ -122,8 +122,7 @@ class OrgChartController<T> extends ChangeNotifier {
   /// The [OrgNode] wrapping every currently visible node's data, in the
   /// order they appear in [state]. Each entry's `.data` is the original
   /// item passed to the constructor/[setData], not the item itself.
-  List<OrgNode<T>> get visibleNodes =>
-      _state.nodes.map((n) => n.node).toList();
+  List<OrgNode<T>> get visibleNodes => _state.nodes.map((n) => n.node).toList();
 
   /// Looks up a node anywhere in the tree by id (regardless of whether it
   /// is currently visible), or `null` if no node has that id.
@@ -195,8 +194,11 @@ class OrgChartController<T> extends ChangeNotifier {
   /// default) and [expanded] is true, expands every ancestor too so the
   /// node is actually reachable/visible — expanding a node whose parent
   /// chain is collapsed would otherwise have no visible effect.
-  void setExpanded(String id,
-      {bool expanded = true, bool expandAncestors = true}) {
+  void setExpanded(
+    String id, {
+    bool expanded = true,
+    bool expandAncestors = true,
+  }) {
     final node = _tree?.nodeById(id);
     if (node == null) return;
     node.isExpanded = expanded;
@@ -264,9 +266,10 @@ class OrgChartController<T> extends ChangeNotifier {
     final v = _viewport;
     if (v == null) {
       throw StateError(
-          'No OrgChart widget is attached to this controller. '
-          'Viewport navigation (fit/centerNode/zoomIn/zoomOut) requires an '
-          'OrgChart widget built with this controller.');
+        'No OrgChart widget is attached to this controller. '
+        'Viewport navigation (fit/centerNode/zoomIn/zoomOut) requires an '
+        'OrgChart widget built with this controller.',
+      );
     }
     return v;
   }
@@ -283,8 +286,11 @@ class OrgChartController<T> extends ChangeNotifier {
   /// directly first — "center on this node" should reveal it, not silently
   /// no-op. The target node's own expanded flag is left untouched: revealing
   /// a node is not the same as expanding it.
-  void centerNode(String id,
-      {bool withDescendants = false, bool animate = true}) {
+  void centerNode(
+    String id, {
+    bool withDescendants = false,
+    bool animate = true,
+  }) {
     final v = _requireViewport;
     final node = _tree?.nodeById(id);
     if (node == null) return;

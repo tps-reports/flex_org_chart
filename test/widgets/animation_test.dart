@@ -62,22 +62,27 @@ class _ToggleHarnessState extends State<_ToggleHarness> {
 }
 
 void main() {
-  testWidgets('expanding animates the new child in from its parent',
-      (tester) async {
-    final c = OrgChartController<Row>(data: const [
-      (id: 'a', parentId: null),
-      (id: 'b', parentId: 'a'),
-    ], idOf: (r) => r.id, parentIdOf: (r) => r.parentId, initialExpandLevel: 0);
-    await tester.pumpWidget(MaterialApp(
-      home: OrgChart<Row>(
-        controller: c,
-        compact: false,
-        nodeSize: (_) => (w: 100, h: 50),
-        animationDuration: const Duration(milliseconds: 400),
-        nodeBuilder: (_, n) =>
-            Text('node-${n.id}', key: ValueKey('node-${n.id}')),
+  testWidgets('expanding animates the new child in from its parent', (
+    tester,
+  ) async {
+    final c = OrgChartController<Row>(
+      data: const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')],
+      idOf: (r) => r.id,
+      parentIdOf: (r) => r.parentId,
+      initialExpandLevel: 0,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          animationDuration: const Duration(milliseconds: 400),
+          nodeBuilder: (_, n) =>
+              Text('node-${n.id}', key: ValueKey('node-${n.id}')),
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     c.expand('a');
     await tester.pump(); // start animation
@@ -91,20 +96,24 @@ void main() {
     expect(midY, lessThan(endY));
   });
 
-  testWidgets('collapsing removes the child after the animation completes',
-      (tester) async {
-    final c = OrgChartController<Row>(data: const [
-      (id: 'a', parentId: null),
-      (id: 'b', parentId: 'a'),
-    ], idOf: (r) => r.id, parentIdOf: (r) => r.parentId);
-    await tester.pumpWidget(MaterialApp(
-      home: OrgChart<Row>(
-        controller: c,
-        compact: false,
-        nodeBuilder: (_, n) =>
-            Text('node-${n.id}', key: ValueKey('node-${n.id}')),
+  testWidgets('collapsing removes the child after the animation completes', (
+    tester,
+  ) async {
+    final c = OrgChartController<Row>(
+      data: const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')],
+      idOf: (r) => r.id,
+      parentIdOf: (r) => r.parentId,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: OrgChart<Row>(
+          controller: c,
+          compact: false,
+          nodeBuilder: (_, n) =>
+              Text('node-${n.id}', key: ValueKey('node-${n.id}')),
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     c.collapse('a');
     await tester.pump(const Duration(milliseconds: 100));
@@ -122,60 +131,67 @@ void main() {
   // and "to" onto the same rects and the animation snapped to its end.
 
   testWidgets(
-      'highlighting mid-expand-animation does not snap the animation to '
-      'its final position', (tester) async {
-    final c = OrgChartController<Row>(data: const [
-      (id: 'a', parentId: null),
-      (id: 'b', parentId: 'a'),
-    ], idOf: (r) => r.id, parentIdOf: (r) => r.parentId, initialExpandLevel: 0);
-    await tester.pumpWidget(MaterialApp(
-      home: OrgChart<Row>(
-        controller: c,
-        compact: false,
-        nodeSize: (_) => (w: 100, h: 50),
-        animationDuration: const Duration(milliseconds: 400),
-        nodeBuilder: (_, n) =>
-            Text('node-${n.id}', key: ValueKey('node-${n.id}')),
-      ),
-    ));
-    await tester.pumpAndSettle();
+    'highlighting mid-expand-animation does not snap the animation to '
+    'its final position',
+    (tester) async {
+      final c = OrgChartController<Row>(
+        data: const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')],
+        idOf: (r) => r.id,
+        parentIdOf: (r) => r.parentId,
+        initialExpandLevel: 0,
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: OrgChart<Row>(
+            controller: c,
+            compact: false,
+            nodeSize: (_) => (w: 100, h: 50),
+            animationDuration: const Duration(milliseconds: 400),
+            nodeBuilder: (_, n) =>
+                Text('node-${n.id}', key: ValueKey('node-${n.id}')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    c.expand('a');
-    await tester.pump(); // start the enter animation
-    await tester.pump(const Duration(milliseconds: 100)); // ~25% through
+      c.expand('a');
+      await tester.pump(); // start the enter animation
+      await tester.pump(const Duration(milliseconds: 100)); // ~25% through
 
-    // A highlight is a notify with no layout change — it must not disturb
-    // the in-flight expand animation.
-    c.highlight('a');
-    await tester.pump(); // one frame after the highlight-triggered notify
+      // A highlight is a notify with no layout change — it must not disturb
+      // the in-flight expand animation.
+      c.highlight('a');
+      await tester.pump(); // one frame after the highlight-triggered notify
 
-    final midY = tester.getTopLeft(find.byKey(const ValueKey('node-b'))).dy;
+      final midY = tester.getTopLeft(find.byKey(const ValueKey('node-b'))).dy;
 
-    await tester.pumpAndSettle();
-    final endY = tester.getTopLeft(find.byKey(const ValueKey('node-b'))).dy;
+      await tester.pumpAndSettle();
+      final endY = tester.getTopLeft(find.byKey(const ValueKey('node-b'))).dy;
 
-    // Bug symptom: the highlight-triggered notify made `_mergedNodes` (or,
-    // pre-fix, the live controller reads it used) collapse "from" and "to"
-    // onto the same rect, so `midY` came out equal to `endY` well before
-    // the 400ms animation should have finished.
-    expect(midY, isNot(closeTo(endY, 0.5)));
-  });
+      // Bug symptom: the highlight-triggered notify made `_mergedNodes` (or,
+      // pre-fix, the live controller reads it used) collapse "from" and "to"
+      // onto the same rect, so `midY` came out equal to `endY` well before
+      // the 400ms animation should have finished.
+      expect(midY, isNot(closeTo(endY, 0.5)));
+    },
+  );
 
-  testWidgets(
-      'an unrelated ancestor rebuild mid-collapse does not make the '
-      'exiting node vanish before its exit animation finishes',
-      (tester) async {
-    final c = OrgChartController<Row>(data: const [
-      (id: 'a', parentId: null),
-      (id: 'b', parentId: 'a'),
-    ], idOf: (r) => r.id, parentIdOf: (r) => r.parentId);
+  testWidgets('an unrelated ancestor rebuild mid-collapse does not make the '
+      'exiting node vanish before its exit animation finishes', (tester) async {
+    final c = OrgChartController<Row>(
+      data: const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')],
+      idOf: (r) => r.id,
+      parentIdOf: (r) => r.parentId,
+    );
     VoidCallback? triggerRebuild;
-    await tester.pumpWidget(MaterialApp(
-      home: _RebuildHarness(
-        controller: c,
-        onRebuild: (fn) => triggerRebuild = fn,
+    await tester.pumpWidget(
+      MaterialApp(
+        home: _RebuildHarness(
+          controller: c,
+          onRebuild: (fn) => triggerRebuild = fn,
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
 
     c.collapse('a');
@@ -198,16 +214,15 @@ void main() {
     expect(find.byKey(const ValueKey('node-b')), findsNothing);
   });
 
-  testWidgets(
-      'the example app\'s onExpandToggle: (_, __) => setState(() {}) '
+  testWidgets('the example app\'s onExpandToggle: (_, __) => setState(() {}) '
       'pattern does not suppress the entrance animation', (tester) async {
-    final c = OrgChartController<Row>(data: const [
-      (id: 'a', parentId: null),
-      (id: 'b', parentId: 'a'),
-    ], idOf: (r) => r.id, parentIdOf: (r) => r.parentId, initialExpandLevel: 0);
-    await tester.pumpWidget(MaterialApp(
-      home: _ToggleHarness(controller: c),
-    ));
+    final c = OrgChartController<Row>(
+      data: const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')],
+      idOf: (r) => r.id,
+      parentIdOf: (r) => r.parentId,
+      initialExpandLevel: 0,
+    );
+    await tester.pumpWidget(MaterialApp(home: _ToggleHarness(controller: c)));
     await tester.pumpAndSettle();
 
     // Tap the default expand button under the root, exactly like a user

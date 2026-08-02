@@ -32,8 +32,9 @@ class CompactLayout<T> {
     }
     for (final node in _preorder(root)) {
       if (node.children.length <= 1) continue;
-      final compactChildren =
-          node.children.where((d) => d.children.isEmpty).toList();
+      final compactChildren = node.children
+          .where((d) => d.children.isEmpty)
+          .toList();
       if (compactChildren.length < 2) continue;
       for (var i = 0; i < compactChildren.length; i++) {
         final child = compactChildren[i];
@@ -45,8 +46,9 @@ class CompactLayout<T> {
           .where((d) => d.compactEven == true)
           .map(nodeWidth)
           .reduce((a, b) => a > b ? a : b);
-      final oddNodes =
-          compactChildren.where((d) => d.compactEven == false).toList();
+      final oddNodes = compactChildren
+          .where((d) => d.compactEven == false)
+          .toList();
       final oddMax = oddNodes.isEmpty
           ? 0.0
           : oddNodes.map(nodeWidth).reduce((a, b) => a > b ? a : b);
@@ -75,8 +77,9 @@ class CompactLayout<T> {
   void computePositions(FlexNode<T> root) {
     for (final node in _preorder(root)) {
       if (node.children.isEmpty) continue;
-      final compactChildren =
-          node.children.where((d) => d.flexCompactDim != null).toList();
+      final compactChildren = node.children
+          .where((d) => d.flexCompactDim != null)
+          .toList();
       if (compactChildren.isEmpty) continue;
       final fch = compactChildren.first;
       for (var i = 0; i < compactChildren.length; i++) {

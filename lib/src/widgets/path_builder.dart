@@ -14,13 +14,13 @@ Path buildPath(List<PathCommand> commands) {
       case LineTo(:final x, :final y):
         path.lineTo(x, y);
       case CubicTo(
-          :final x1,
-          :final y1,
-          :final x2,
-          :final y2,
-          :final x,
-          :final y
-        ):
+        :final x1,
+        :final y1,
+        :final x2,
+        :final y2,
+        :final x,
+        :final y,
+      ):
         path.cubicTo(x1, y1, x2, y2, x, y);
     }
   }

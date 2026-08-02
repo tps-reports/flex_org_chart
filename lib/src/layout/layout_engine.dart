@@ -108,8 +108,7 @@ class LayoutEngine {
 
     // 3) Flextree.
     FlexTreeLayout<OrgNode<T>?>(
-      spacing: (a, b) =>
-          identical(a.parent, b.parent) ? 0 : spacing.neighbour,
+      spacing: (a, b) => identical(a.parent, b.parent) ? 0 : spacing.neighbour,
     ).run(synthetic);
     compactPass?.computePositions(synthetic);
 
@@ -124,8 +123,7 @@ class LayoutEngine {
     final rectById = <String, LayoutRect>{};
     for (final fn in flexById.values) {
       final size = nodeSize(fn.item!);
-      final rect =
-          orient(layout, fn.x, fn.y, size.w, size.h, maxDepthExtent);
+      final rect = orient(layout, fn.x, fn.y, size.w, size.h, maxDepthExtent);
       rectById[fn.item!.id] = rect;
       nodes.add(NodeLayout(fn.item!, rect));
     }
@@ -140,16 +138,25 @@ class LayoutEngine {
       final p = rectById[parent.id]!;
       final commands = switch (layout) {
         ChartLayout.top => verticalDiagonal(
-            s: (x: c.centerX, y: c.top), t: (x: p.centerX, y: p.bottom)),
+          s: (x: c.centerX, y: c.top),
+          t: (x: p.centerX, y: p.bottom),
+        ),
         ChartLayout.bottom => verticalDiagonal(
-            s: (x: c.centerX, y: c.bottom), t: (x: p.centerX, y: p.top)),
+          s: (x: c.centerX, y: c.bottom),
+          t: (x: p.centerX, y: p.top),
+        ),
         ChartLayout.left => horizontalDiagonal(
-            s: (x: c.left, y: c.centerY), t: (x: p.right, y: p.centerY)),
+          s: (x: c.left, y: c.centerY),
+          t: (x: p.right, y: p.centerY),
+        ),
         ChartLayout.right => horizontalDiagonal(
-            s: (x: c.right, y: c.centerY), t: (x: p.left, y: p.centerY)),
+          s: (x: c.right, y: c.centerY),
+          t: (x: p.left, y: p.centerY),
+        ),
       };
-      links.add(LinkLayout(
-          childId: node.id, parentId: parent.id, commands: commands));
+      links.add(
+        LinkLayout(childId: node.id, parentId: parent.id, commands: commands),
+      );
     }
 
     // 6) Bounds.

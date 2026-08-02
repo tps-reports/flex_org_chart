@@ -3,12 +3,17 @@ import 'package:flex_org_chart/flex_org_chart.dart';
 
 typedef Row = ({String id, String? parentId});
 
-ChartState<Row> compute(List<Row> rows,
-    {ChartLayout layout = ChartLayout.top,
-    bool compact = false,
-    bool Function(OrgNode<Row>)? isVisible}) {
+ChartState<Row> compute(
+  List<Row> rows, {
+  ChartLayout layout = ChartLayout.top,
+  bool compact = false,
+  bool Function(OrgNode<Row>)? isVisible,
+}) {
   final tree = stratify<Row>(
-      data: rows, idOf: (r) => r.id, parentIdOf: (r) => r.parentId);
+    data: rows,
+    idOf: (r) => r.id,
+    parentIdOf: (r) => r.parentId,
+  );
   return LayoutEngine.compute<Row>(
     tree: tree,
     isVisible: isVisible ?? (_) => true,
@@ -43,8 +48,14 @@ void main() {
   test('bottom layout mirrors top vertically', () {
     final top = compute(rows);
     final bottom = compute(rows, layout: ChartLayout.bottom);
-    expect(bottom.byId('b')!.rect.bottom, lessThan(bottom.byId('a')!.rect.top + 1));
-    expect(bottom.byId('b')!.rect.left, closeTo(top.byId('b')!.rect.left, 1e-6));
+    expect(
+      bottom.byId('b')!.rect.bottom,
+      lessThan(bottom.byId('a')!.rect.top + 1),
+    );
+    expect(
+      bottom.byId('b')!.rect.left,
+      closeTo(top.byId('b')!.rect.left, 1e-6),
+    );
   });
 
   test('collapsed subtree is excluded from nodes and links', () {
@@ -56,7 +67,10 @@ void main() {
   test('multi-root lays out side by side', () {
     final st = compute([(id: 'a', parentId: null), (id: 'x', parentId: null)]);
     expect(st.byId('a')!.rect.top, closeTo(st.byId('x')!.rect.top, 1e-6));
-    expect(st.byId('a')!.rect.right, lessThanOrEqualTo(st.byId('x')!.rect.left));
+    expect(
+      st.byId('a')!.rect.right,
+      lessThanOrEqualTo(st.byId('x')!.rect.left),
+    );
     expect(st.links, isEmpty);
   });
 }

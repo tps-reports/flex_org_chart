@@ -117,7 +117,8 @@ class FlexTreeLayout<T> {
     var mscl = cl._mod;
     while (sr != null && cl != null) {
       if (_bottom(sr) > ih!.lowY) ih = ih.next;
-      final dist = (mssr + sr._prelim + sr.xSize) -
+      final dist =
+          (mssr + sr._prelim + sr.xSize) -
           (mscl + cl._prelim) +
           spacing(sr, cl);
       if (dist > 0) {
@@ -177,7 +178,8 @@ class FlexTreeLayout<T> {
   }
 
   void _positionRoot(FlexNode<T> t) {
-    t._prelim = (t.children.first._prelim +
+    t._prelim =
+        (t.children.first._prelim +
                 t.children.first._mod +
                 t.children.last._mod +
                 t.children.last._prelim +

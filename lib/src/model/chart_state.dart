@@ -18,8 +18,11 @@ class NodeLayout<T> {
 /// from a child node to its parent.
 class LinkLayout {
   /// Creates a link between [childId] and [parentId] described by [commands].
-  const LinkLayout(
-      {required this.childId, required this.parentId, required this.commands});
+  const LinkLayout({
+    required this.childId,
+    required this.parentId,
+    required this.commands,
+  });
 
   /// Id of the child endpoint.
   final String childId;
@@ -40,7 +43,7 @@ class ChartState<T> {
   /// Creates a chart state from its visible [nodes], parent-child [links],
   /// and overall [bounds].
   ChartState({required this.nodes, required this.links, required this.bounds})
-      : _byId = {for (final n in nodes) n.node.id: n};
+    : _byId = {for (final n in nodes) n.node.id: n};
 
   /// Every currently visible node, with its laid-out rectangle.
   final List<NodeLayout<T>> nodes;
@@ -60,7 +63,10 @@ class ChartState<T> {
   /// A [ChartState] with no nodes, links, or bounds — the state before any
   /// data has been laid out.
   static ChartState<T> empty<T>() => ChartState(
-      nodes: const [], links: const [], bounds: const LayoutRect(0, 0, 0, 0));
+    nodes: const [],
+    links: const [],
+    bounds: const LayoutRect(0, 0, 0, 0),
+  );
 
   /// True when animating from [a] to [b] would actually move, add, or
   /// remove anything visible: a different visible node count, different

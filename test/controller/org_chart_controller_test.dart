@@ -10,12 +10,14 @@ OrgChartController<Row> make(List<Row> rows, {int initialExpandLevel = 1}) {
     parentIdOf: (r) => r.parentId,
     initialExpandLevel: initialExpandLevel,
   );
-  c.configure(OrgChartConfig<Row>(
-    layout: ChartLayout.top,
-    compact: false,
-    spacing: const ChartSpacing(),
-    nodeSize: (_) => (w: 250, h: 150),
-  ));
+  c.configure(
+    OrgChartConfig<Row>(
+      layout: ChartLayout.top,
+      compact: false,
+      spacing: const ChartSpacing(),
+      nodeSize: (_) => (w: 250, h: 150),
+    ),
+  );
   return c;
 }
 

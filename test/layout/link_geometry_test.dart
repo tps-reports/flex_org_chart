@@ -10,8 +10,10 @@ void main() {
     expect(cmds.first, const MoveTo(0, 300));
     expect(cmds.last, const LineTo(0, 150));
     // no curvature when horizontally aligned:
-    expect(cmds.whereType<CubicTo>().every((c) => c.x1 == 0 && c.x2 == 0),
-        isTrue);
+    expect(
+      cmds.whereType<CubicTo>().every((c) => c.x1 == 0 && c.x2 == 0),
+      isTrue,
+    );
   });
 
   test('verticalDiagonal, offset child produces symmetric S-curve', () {
@@ -23,7 +25,14 @@ void main() {
       LineTo(200, 300),
       LineTo(200, 300),
       LineTo(200, 260), // y + h*yrvs = 300 - 40
-      CubicTo(200, 225, 200, 225, 165, 225), // y+h*yrvs+r*yrvs=225; x+r*xrvs=165
+      CubicTo(
+        200,
+        225,
+        200,
+        225,
+        165,
+        225,
+      ), // y+h*yrvs+r*yrvs=225; x+r*xrvs=165
       LineTo(35, 225), // x + w*xrvs + r*xrvs = 200 -130 -35
       CubicTo(0, 225, 0, 225, 0, 190), // ex; ey - h*yrvs = 150 + 40
       LineTo(0, 150),

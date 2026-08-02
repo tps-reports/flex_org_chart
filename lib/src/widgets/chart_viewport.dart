@@ -94,8 +94,10 @@ class _ChartViewportState extends State<ChartViewport> {
     final focalStart = _focalStart;
     if (start == null || focalStart == null) return;
     final startScale = start.getMaxScaleOnAxis();
-    final targetScale =
-        (startScale * details.scale).clamp(_minScale, _maxScale);
+    final targetScale = (startScale * details.scale).clamp(
+      _minScale,
+      _maxScale,
+    );
     final appliedScale = targetScale / startScale;
     final focalCurrent = details.localFocalPoint;
     _tc.value = Matrix4.identity()

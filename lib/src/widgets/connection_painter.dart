@@ -16,6 +16,7 @@ class ConnectionStyle {
     this.dash = const [7, 7],
     this.labelStyle,
   });
+
   /// Stroke color for the arc, its arrowhead, and its label's default style.
   final Color color;
 
@@ -43,7 +44,8 @@ class ConnectionStyle {
           labelStyle == other.labelStyle;
 
   @override
-  int get hashCode => Object.hash(color, width, Object.hashAll(dash), labelStyle);
+  int get hashCode =>
+      Object.hash(color, width, Object.hashAll(dash), labelStyle);
 }
 
 bool _listEquals(List<double> a, List<double> b) {
@@ -82,11 +84,14 @@ class ConnectionPainter extends CustomPainter {
     required this.style,
     required this.origin,
   }) : visibleConnections = [
-          for (final c in connections)
-            if (state.byId(c.from) != null && state.byId(c.to) != null)
-              VisibleConnection(
-                  c, state.byId(c.from)!.rect, state.byId(c.to)!.rect),
-        ];
+         for (final c in connections)
+           if (state.byId(c.from) != null && state.byId(c.to) != null)
+             VisibleConnection(
+               c,
+               state.byId(c.from)!.rect,
+               state.byId(c.to)!.rect,
+             ),
+       ];
 
   final List<VisibleConnection> visibleConnections;
   final ConnectionStyle style;
@@ -149,9 +154,10 @@ class ConnectionPainter extends CustomPainter {
       if (label != null) {
         final tp = TextPainter(
           text: TextSpan(
-              text: label,
-              style: style.labelStyle ??
-                  TextStyle(color: style.color, fontSize: 11)),
+            text: label,
+            style:
+                style.labelStyle ?? TextStyle(color: style.color, fontSize: 11),
+          ),
           textDirection: TextDirection.ltr,
         )..layout();
         tp.paint(canvas, Offset(s.dx, s.dy - tp.height - 4));
@@ -186,7 +192,9 @@ class ConnectionPainter extends CustomPainter {
     Offset barb(double deltaAngle) {
       final a = backAngle + deltaAngle;
       return Offset(
-          tip.dx + barbLength * math.cos(a), tip.dy + barbLength * math.sin(a));
+        tip.dx + barbLength * math.cos(a),
+        tip.dy + barbLength * math.sin(a),
+      );
     }
 
     final head = Path()

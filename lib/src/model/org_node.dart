@@ -53,6 +53,7 @@ class OrgNode<T> {
         walk(c);
       }
     }
+
     walk(this);
     return n;
   }
