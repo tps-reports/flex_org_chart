@@ -88,7 +88,7 @@ final controller = OrgChartController<Employee>(
   data: employees,
   idOf: (e) => e.id,
   parentIdOf: (e) => e.managerId,
-  withParent: (e, id) => e.copyWith(managerId: id), // enables reparent/promotion
+  withParent: (e, id) => Employee(e.id, id, e.name), // enables reparent/promotion
   onDataChanged: (data) => api.save(data),
 );
 
