@@ -583,6 +583,12 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     if (!_dragEnabled || _layoutAnim.isAnimating || _snapBack.isAnimating) {
       return;
     }
+    // One drag at a time: first finger to lift a node wins. Without this, a
+    // second finger long-pressing a different node mid-drag would overwrite
+    // `_drag`, and the first finger's still-active recognizer would then
+    // compute nonsense (its localPosition against the new node's
+    // sourceRect) or fire onReparent for the wrong node on release.
+    if (_drag != null) return;
     HapticFeedback.selectionClick();
     setState(() {
       _drag = DragState<T>(
@@ -799,11 +805,30 @@ class _OrgChartState<T> extends State<OrgChart<T>>
                     onLongPressStart: !_dragEnabled
                         ? null
                         : (d) => _startDrag(n.node, n.rect, d.localPosition),
+                    // Guarded by node identity: a second finger's recognizer
+                    // can still fire these callbacks for a node that isn't
+                    // the one actually being dragged (e.g. a rejected
+                    // long-press on another node cancels while its arena
+                    // entry is still `possible`) — act only on the finger
+                    // that owns the in-flight drag.
                     onLongPressMoveUpdate: !_dragEnabled
                         ? null
-                        : (d) => _updateDrag(d.localPosition),
-                    onLongPressEnd: !_dragEnabled ? null : (_) => _endDrag(),
-                    onLongPressCancel: !_dragEnabled ? null : _cancelDrag,
+                        : (d) {
+                            if (_drag?.node.id != n.node.id) return;
+                            _updateDrag(d.localPosition);
+                          },
+                    onLongPressEnd: !_dragEnabled
+                        ? null
+                        : (_) {
+                            if (_drag?.node.id != n.node.id) return;
+                            _endDrag();
+                          },
+                    onLongPressCancel: !_dragEnabled
+                        ? null
+                        : () {
+                            if (_drag?.node.id != n.node.id) return;
+                            _cancelDrag();
+                          },
                     child: widget.nodeBuilder(context, n.node),
                   ),
                 ),

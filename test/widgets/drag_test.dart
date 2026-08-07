@@ -298,4 +298,98 @@ void main() {
     expect(fired, isFalse);
     expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
   });
+
+  testWidgets(
+    'a second finger long-pressing another node mid-drag neither hijacks '
+    'nor cancels the in-flight drag',
+    (tester) async {
+      final c = makeController();
+      (String, String)? fired;
+      await tester.pumpWidget(
+        app(
+          c,
+          onReparent: (node, newParent) => fired = (node.id, newParent.id),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Finger A lifts node d.
+      final gA = await lift(tester, 'node-d');
+      expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+      final ghostBefore = tester.getTopLeft(
+        find.byKey(const ValueKey('drag-ghost')),
+      );
+
+      // Finger B long-presses a *different* node (b) while A's drag is
+      // still in flight. Without the node-identity guards, this would
+      // either hijack `_drag` onto node b (in `_startDrag`) or, on release,
+      // feed A's frozen sourceRect through B's localPosition and/or cancel
+      // A's drag outright.
+      final gB = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('node-b'))),
+      );
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+
+      // A's ghost is untouched by B's long-press winning its own arena.
+      expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('drag-ghost'))),
+        ghostBefore,
+      );
+
+      // B moves and releases over node b — must not corrupt A's drag state
+      // or fire onReparent for the wrong pair.
+      await gB.moveBy(const Offset(20, 20));
+      await tester.pump();
+      await gB.up();
+      await tester.pump();
+      expect(fired, isNull);
+      expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+
+      // A's drag survives: dropping it on node b now still fires onReparent
+      // with node d as the dragged node, proving `_drag` was never
+      // hijacked or cancelled by B's interference.
+      await gA.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+      await tester.pump();
+      await gA.up();
+      await tester.pump();
+      expect(fired, ('d', 'b'));
+      expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+    },
+  );
+
+  testWidgets('a second finger quick-tapping another node mid-drag (rejected '
+      'long-press) does not cancel the in-flight drag', (tester) async {
+    final c = makeController();
+    (String, String)? fired;
+    await tester.pumpWidget(
+      app(c, onReparent: (node, newParent) => fired = (node.id, newParent.id)),
+    );
+    await tester.pumpAndSettle();
+
+    // Finger A lifts node d.
+    final gA = await lift(tester, 'node-d');
+    expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+
+    // Finger B quick-taps node b: down then straight back up, well before
+    // the long-press timeout. Its LongPressGestureRecognizer rejects
+    // (arena state still `possible`) and fires onLongPressCancel for
+    // node b — which, unguarded, would call `_cancelDrag()` and kill A's
+    // in-flight drag even though B never touched node d.
+    final gB = await tester.startGesture(
+      tester.getCenter(find.byKey(const ValueKey('node-b'))),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+    await gB.up();
+    await tester.pump();
+
+    // A's drag survives B's rejected long-press.
+    expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+
+    await gA.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    await gA.up();
+    await tester.pump();
+    expect(fired, ('d', 'b'));
+  });
 }
