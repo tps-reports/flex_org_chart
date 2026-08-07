@@ -18,6 +18,7 @@ export 'src/layout/link_geometry.dart'
 export 'src/layout/stratify.dart' show stratify;
 export 'src/model/chart_state.dart';
 export 'src/model/connection.dart';
+export 'src/model/chart_group.dart';
 export 'src/model/geometry.dart';
 export 'src/model/org_chart_data_exception.dart';
 export 'src/model/org_node.dart';
