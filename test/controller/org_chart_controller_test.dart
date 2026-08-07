@@ -145,4 +145,61 @@ void main() {
     c.centerNode('d', withDescendants: true, animate: false);
     expect(handle.fitBoundsCalls, hasLength(1));
   });
+
+  group('setData preserveState', () {
+    test('surviving ids keep expansion state by default', () {
+      final c = make(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+        (id: 'c', parentId: 'b'),
+      ]);
+      c.expand('b'); // deeper than initialExpandLevel=1
+      expect(c.state.byId('c'), isNotNull);
+      // Same tree plus one new leaf under c.
+      c.setData(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+        (id: 'c', parentId: 'b'),
+        (id: 'd', parentId: 'c'),
+      ]);
+      // b's expansion survived: c still visible.
+      expect(c.state.byId('c'), isNotNull);
+      // New node d follows the initial-expand rule for its parent (c was
+      // never expanded, so d is hidden).
+      expect(c.state.byId('d'), isNull);
+    });
+
+    test('surviving ids keep highlight flags by default', () {
+      final c = make(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+      ]);
+      c.highlightPathToRoot('b');
+      c.setData(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+        (id: 'x', parentId: 'a'),
+      ]);
+      expect(c.nodeById('b')!.isHighlighted, isTrue);
+      expect(c.nodeById('a')!.isOnHighlightedPath, isTrue);
+      expect(c.nodeById('x')!.isHighlighted, isFalse);
+    });
+
+    test('preserveState: false reproduces the full reset', () {
+      final c = make(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+        (id: 'c', parentId: 'b'),
+      ]);
+      c.expand('b');
+      c.highlight('b');
+      c.setData(const [
+        (id: 'a', parentId: null),
+        (id: 'b', parentId: 'a'),
+        (id: 'c', parentId: 'b'),
+      ], preserveState: false);
+      expect(c.state.byId('c'), isNull); // b back to collapsed (depth 1)
+      expect(c.nodeById('b')!.isHighlighted, isFalse);
+    });
+  });
 }

@@ -164,12 +164,38 @@ class OrgChartController<T> extends ChangeNotifier {
 
   /// Replaces the backing data and re-stratifies the tree. If the new data
   /// is malformed, [dataError] is set and [state] becomes an empty
-  /// [ChartState] — this method never throws. On success, initial-expand
-  /// flags are re-applied exactly as they are for the constructor's data.
-  void setData(List<T> data) {
+  /// [ChartState] — this method never throws.
+  ///
+  /// With [preserveState] true (the default), nodes whose ids survive into
+  /// the new data keep their expansion and highlight flags; only new ids
+  /// get the [initialExpandLevel] rule. Pass false to reset every node's
+  /// state exactly as the constructor does — the pre-0.2 behavior.
+  void setData(List<T> data, {bool preserveState = true}) {
+    Map<String, ({bool expanded, bool highlighted, bool onPath})>? saved;
+    final oldTree = _tree;
+    if (preserveState && oldTree != null) {
+      saved = {
+        for (final n in oldTree.allNodes)
+          n.id: (
+            expanded: n.isExpanded,
+            highlighted: n.isHighlighted,
+            onPath: n.isOnHighlightedPath,
+          ),
+      };
+    }
     _data = List.of(data);
     _tree = null;
     _rebuildTreeIfNeeded();
+    final newTree = _tree;
+    if (saved != null && newTree != null) {
+      for (final n in newTree.allNodes) {
+        final s = saved[n.id];
+        if (s == null) continue;
+        n.isExpanded = s.expanded;
+        n.isHighlighted = s.highlighted;
+        n.isOnHighlightedPath = s.onPath;
+      }
+    }
     _relayout();
   }
 
