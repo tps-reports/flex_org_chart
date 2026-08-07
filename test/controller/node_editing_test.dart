@@ -296,13 +296,15 @@ void main() {
 
     test('combined update+reparent is honored and validated', () {
       final c = makeNamed();
-      c.updateNode((id: 'd', parentId: 'b', name: 'Dee'));
-      expect(c.nodeById('d')!.parent!.id, 'b');
-      // Cycle via updateNode is rejected like reparent:
+      // Cycle via updateNode is rejected like reparent (d is currently
+      // c's descendant):
       expect(
         () => c.updateNode((id: 'c', parentId: 'd', name: 'Cal')),
         throwsArgumentError,
       );
+      // A legal combined update+reparent is honored:
+      c.updateNode((id: 'd', parentId: 'b', name: 'Dee'));
+      expect(c.nodeById('d')!.parent!.id, 'b');
     });
 
     test('expansion and highlight survive an update', () {
