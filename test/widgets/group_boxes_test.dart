@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flex_org_chart/flex_org_chart.dart';
 import 'package:flex_org_chart/src/widgets/group_hulls.dart';
+import 'package:flex_org_chart/src/widgets/group_box_painter.dart';
+import 'package:flex_org_chart/src/widgets/path_builder.dart';
 
 typedef R = ({String id, String? parentId});
 
@@ -164,6 +166,100 @@ void main() {
       final byId = {for (final h in hulls) h.group.rootId: h.rect};
       expect(byId['b']!.left, -180); // -150 - 30
       expect(byId['c']!.left, 145); // 150 - 5
+    });
+  });
+
+  group('dashedPath', () {
+    Path line() => Path()
+      ..moveTo(0, 0)
+      ..lineTo(100, 0);
+
+    test('valid pattern produces multiple contours', () {
+      final dashed = dashedPath(line(), const [10, 10]);
+      expect(dashed.computeMetrics().length, greaterThan(1));
+    });
+
+    test('empty or non-positive patterns fall back to the source path', () {
+      // Regression guard shared with ConnectionPainter: a zero entry must
+      // not hang the dash walk (see connections_test.dart 'invalid dash
+      // patterns').
+      for (final bad in [
+        <double>[],
+        <double>[0],
+        <double>[5, -1],
+      ]) {
+        final result = dashedPath(line(), bad);
+        expect(result.computeMetrics().single.length, 100);
+      }
+    });
+  });
+
+  group('GroupBoxPainter', () {
+    GroupHull hull({GroupBoxStyle? style, String? label}) => GroupHull(
+      group: ChartGroup(rootId: 'x', label: label, style: style),
+      rect: const LayoutRect(10, 20, 200, 100),
+      rootDepth: 0,
+    );
+
+    test('resolves per-group style over the default', () {
+      const override = GroupBoxStyle(borderColor: Color(0xFF123456));
+      final p = GroupBoxPainter(
+        hulls: [hull(style: override)],
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      expect(p.styleFor(p.hulls.single), override);
+      final q = GroupBoxPainter(
+        hulls: [hull()],
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      expect(q.styleFor(q.hulls.single), const GroupBoxStyle());
+    });
+
+    test('shouldRepaint on hull rect, origin, or default style change', () {
+      final a = GroupBoxPainter(
+        hulls: [hull()],
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      final same = GroupBoxPainter(
+        hulls: [hull()],
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      // Same group instances are NOT used here (hull() builds fresh
+      // ChartGroups), so repaint is expected; identical lists are not.
+      final moved = GroupBoxPainter(
+        hulls: [
+          GroupHull(
+            group: a.hulls.single.group,
+            rect: const LayoutRect(0, 0, 5, 5),
+            rootDepth: 0,
+          ),
+        ],
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      expect(moved.shouldRepaint(a), isTrue);
+      final identicalHulls = GroupBoxPainter(
+        hulls: a.hulls,
+        defaultStyle: const GroupBoxStyle(),
+        origin: Offset.zero,
+      );
+      expect(identicalHulls.shouldRepaint(a), isFalse);
+      expect(
+        GroupBoxPainter(
+          hulls: a.hulls,
+          defaultStyle: const GroupBoxStyle(),
+          origin: const Offset(9, 9),
+        ).shouldRepaint(a),
+        isTrue,
+      );
+      // `same` shares no hull instances with `a`, but rects and groups
+      // compare by value/identity respectively; group instances differ →
+      // conservative repaint is acceptable and expected:
+      expect(same.shouldRepaint(a), isTrue);
     });
   });
 }

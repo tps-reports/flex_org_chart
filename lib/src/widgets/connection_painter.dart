@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../model/chart_state.dart';
 import '../model/connection.dart';
 import '../model/geometry.dart';
+import 'path_builder.dart';
 
 /// Visual style for the [ConnectionPainter] overlay: dashed arcs drawn
 /// between arbitrary (non-hierarchical) node pairs declared via
@@ -97,40 +98,12 @@ class ConnectionPainter extends CustomPainter {
   final ConnectionStyle style;
   final Offset origin;
 
-  /// Rebuilds [source] as a dashed path: walks each contour's metrics and
-  /// alternately keeps/drops [style.dash]-length segments. A contour with
-  /// zero length (degenerate/coincident endpoints) contributes nothing —
-  /// `metric.length == 0` short-circuits the `while (d < metric.length)`
-  /// loop immediately, so this never spins or divides by zero.
-  ///
-  /// Invalid dash patterns ([ConnectionStyle.dash] empty, or containing a
-  /// zero/negative entry) fall back to returning [source] unchanged — a
-  /// solid line. ConnectionStyle's const constructor can't validate, and
-  /// without this guard a zero entry makes `d += len` a no-op so the loop
-  /// below never terminates, hanging the render thread on first paint
-  /// (regression tests: 'invalid dash patterns' group in
-  /// connections_test.dart).
+  /// Delegates to [dashedPath] with this style's pattern — see that
+  /// function for the dash walk and the invalid-pattern (solid-line)
+  /// fallback contract, which regression tests in connections_test.dart
+  /// pin through this method.
   @visibleForTesting
-  Path dashPath(Path source) {
-    if (style.dash.isEmpty || style.dash.any((len) => len <= 0)) {
-      return source;
-    }
-    final out = Path();
-    for (final metric in source.computeMetrics()) {
-      var d = 0.0;
-      var draw = true;
-      var i = 0;
-      while (d < metric.length) {
-        final len = style.dash[i % style.dash.length];
-        final end = math.min(d + len, metric.length);
-        if (draw) out.addPath(metric.extractPath(d, end), Offset.zero);
-        d += len;
-        draw = !draw;
-        i++;
-      }
-    }
-    return out;
-  }
+  Path dashPath(Path source) => dashedPath(source, style.dash);
 
   @override
   void paint(Canvas canvas, Size size) {
