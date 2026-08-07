@@ -81,6 +81,7 @@ class OrgChartController<T> extends ChangeNotifier {
     this.initialExpandLevel = 1,
     List<Connection> connections = const [],
     this.onDataChanged,
+    this.withParent,
   }) : _data = List.of(data),
        _connections = List.of(connections);
 
@@ -99,6 +100,14 @@ class OrgChartController<T> extends ChangeNotifier {
   /// and every programmatic or drag-driven edit reaches your backend.
   /// Never fired by [setData]; the app initiated that change itself.
   final void Function(List<T> data)? onDataChanged;
+
+  /// Returns a copy of [item] with its parent id replaced by
+  /// `newParentId` (`null` meaning "make it a root"). Required by
+  /// [reparent] and by [`removeNode`]'s child promotion — the controller
+  /// treats `T` as opaque and cannot write the parent id itself. The
+  /// returned item must keep its id; changing it throws [StateError] at
+  /// the call site.
+  final T Function(T item, String? newParentId)? withParent;
 
   List<T> _data;
   final List<Connection> _connections;
@@ -242,6 +251,78 @@ class OrgChartController<T> extends ChangeNotifier {
     }
     _applyData([..._data, item], preserveState: true);
     _notifyDataChanged();
+  }
+
+  /// Moves the node with [id] (and its whole subtree) under
+  /// [newParentId], or makes it a root when [newParentId] is `null` or
+  /// empty. Re-parenting a node onto its current parent is a silent
+  /// no-op. Expansion/highlight state survives (same ids).
+  ///
+  /// Throws [StateError] if [withParent] was not provided (or if the
+  /// controller is in a data-error state); throws [ArgumentError] for an
+  /// unknown [id], an unknown non-null [newParentId], or when
+  /// [newParentId] is [id] itself or any of its descendants (which would
+  /// create a cycle). On throw, nothing changes.
+  void reparent(String id, String? newParentId) {
+    _assertEditable();
+    _requireWithParent();
+    final node = _requireNode(id);
+    final currentParentId = parentIdOf(node.data);
+    final normalizedNew = _isRootId(newParentId) ? null : newParentId;
+    final normalizedCurrent = _isRootId(currentParentId)
+        ? null
+        : currentParentId;
+    if (normalizedNew == normalizedCurrent) return; // silent no-op
+    _assertValidNewParent(node, normalizedNew);
+    final newData = [
+      for (final e in _data) idOf(e) == id ? _reparented(e, normalizedNew) : e,
+    ];
+    _applyData(newData, preserveState: true);
+    _notifyDataChanged();
+  }
+
+  OrgNode<T> _requireNode(String id) {
+    final node = _tree?.nodeById(id);
+    if (node == null) {
+      throw ArgumentError('no node with id "$id"');
+    }
+    return node;
+  }
+
+  T Function(T, String?) _requireWithParent() {
+    final f = withParent;
+    if (f == null) {
+      throw StateError(
+        'this operation needs the withParent callback: pass '
+        'OrgChartController(withParent: ...) so the controller can write '
+        'a new parent id into your data items',
+      );
+    }
+    return f;
+  }
+
+  T _reparented(T item, String? newParentId) {
+    final result = _requireWithParent()(item, newParentId);
+    if (idOf(result) != idOf(item)) {
+      throw StateError(
+        'withParent must not change the item id: got '
+        '"${idOf(result)}" for "${idOf(item)}"',
+      );
+    }
+    return result;
+  }
+
+  void _assertValidNewParent(OrgNode<T> node, String? newParentId) {
+    if (newParentId == null) return;
+    if (_tree?.nodeById(newParentId) == null) {
+      throw ArgumentError('parent id "$newParentId" does not exist');
+    }
+    if (node.descendants.any((d) => d.id == newParentId)) {
+      throw ArgumentError(
+        'cannot make "$newParentId" the parent of "${node.id}": it is '
+        '"${node.id}" itself or one of its descendants',
+      );
+    }
   }
 
   void _assertEditable() {

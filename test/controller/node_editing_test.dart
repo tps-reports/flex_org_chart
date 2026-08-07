@@ -7,12 +7,14 @@ OrgChartController<Row> make(
   List<Row> data, {
   int initialExpandLevel = 1,
   void Function(List<Row> data)? onDataChanged,
+  Row Function(Row item, String? newParentId)? withParent,
 }) => OrgChartController<Row>(
   data: data,
   idOf: (r) => r.id,
   parentIdOf: (r) => r.parentId,
   initialExpandLevel: initialExpandLevel,
   onDataChanged: onDataChanged,
+  withParent: withParent,
 );
 
 void configure(OrgChartController<Row> c) => c.configure(
@@ -30,6 +32,8 @@ const tree = <Row>[
   (id: 'c', parentId: 'a'),
   (id: 'd', parentId: 'c'),
 ];
+
+Row rowWithParent(Row r, String? p) => (id: r.id, parentId: p);
 
 void main() {
   group('data getter', () {
@@ -122,6 +126,81 @@ void main() {
       configure(c);
       expect(c.dataError, isNotNull);
       expect(() => c.addNode((id: 'e', parentId: null)), throwsStateError);
+    });
+  });
+
+  group('reparent', () {
+    test('moves a subtree and preserves its expansion', () {
+      List<Row>? changed;
+      final c = make(
+        tree,
+        withParent: rowWithParent,
+        onDataChanged: (d) => changed = d,
+      );
+      configure(c);
+      c.expand('c'); // d visible
+      c.reparent('c', 'b');
+      expect(c.nodeById('c')!.parent!.id, 'b');
+      expect(c.nodeById('c')!.isExpanded, isTrue);
+      expect(changed!.firstWhere((r) => r.id == 'c').parentId, 'b');
+    });
+
+    test('null newParentId makes the node a root', () {
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      c.reparent('c', null);
+      expect(c.nodeById('c')!.parent, isNull);
+    });
+
+    test('reparent to current parent is a silent no-op', () {
+      var notified = 0;
+      List<Row>? changed;
+      final c = make(
+        tree,
+        withParent: rowWithParent,
+        onDataChanged: (d) => changed = d,
+      );
+      configure(c);
+      c.addListener(() => notified++);
+      c.reparent('b', 'a');
+      expect(notified, 0);
+      expect(changed, isNull);
+    });
+
+    test('throws StateError without withParent', () {
+      final c = make(tree);
+      configure(c);
+      expect(() => c.reparent('b', 'c'), throwsStateError);
+    });
+
+    test('unknown id / unknown parent / self / descendant all throw', () {
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      expect(() => c.reparent('ghost', 'a'), throwsArgumentError);
+      expect(() => c.reparent('b', 'ghost'), throwsArgumentError);
+      expect(() => c.reparent('b', 'b'), throwsArgumentError);
+      expect(() => c.reparent('c', 'd'), throwsArgumentError); // d under c
+    });
+
+    test('a throw leaves the controller unchanged', () {
+      var notified = 0;
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      c.addListener(() => notified++);
+      expect(() => c.reparent('c', 'd'), throwsArgumentError);
+      expect(c.nodeById('c')!.parent!.id, 'a');
+      expect(notified, 0);
+    });
+
+    test('withParent changing the id throws StateError, nothing mutates', () {
+      final c = make(
+        tree,
+        withParent: (r, p) => (id: '${r.id}-oops', parentId: p),
+      );
+      configure(c);
+      expect(() => c.reparent('b', 'c'), throwsStateError);
+      expect(c.nodeById('b'), isNotNull);
+      expect(c.nodeById('b-oops'), isNull);
     });
   });
 }
