@@ -281,6 +281,32 @@ class OrgChartController<T> extends ChangeNotifier {
     _notifyDataChanged();
   }
 
+  /// Removes the node with [id]. Its direct children are promoted to the
+  /// removed node's parent (via [withParent]); removing a root promotes
+  /// its children to roots. Deeper descendants are untouched. The removed
+  /// id's expansion/highlight state vanishes with it; promoted children
+  /// keep theirs.
+  ///
+  /// Throws [ArgumentError] on an unknown [id]; throws [StateError] if
+  /// the node has children and [withParent] was not provided (a leaf
+  /// removes fine without it), or if the controller is in a data-error
+  /// state. On throw, nothing changes.
+  void removeNode(String id) {
+    _assertEditable();
+    final node = _requireNode(id);
+    final childIds = {for (final child in node.children) child.id};
+    if (childIds.isNotEmpty) _requireWithParent();
+    final rawParentId = parentIdOf(node.data);
+    final promotedParentId = _isRootId(rawParentId) ? null : rawParentId;
+    final newData = [
+      for (final e in _data)
+        if (idOf(e) != id)
+          childIds.contains(idOf(e)) ? _reparented(e, promotedParentId) : e,
+    ];
+    _applyData(newData, preserveState: true);
+    _notifyDataChanged();
+  }
+
   OrgNode<T> _requireNode(String id) {
     final node = _tree?.nodeById(id);
     if (node == null) {

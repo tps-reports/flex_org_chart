@@ -203,4 +203,56 @@ void main() {
       expect(c.nodeById('b-oops'), isNull);
     });
   });
+
+  group('removeNode', () {
+    test('leaf removal needs no withParent', () {
+      List<Row>? changed;
+      final c = make(tree, onDataChanged: (d) => changed = d);
+      configure(c);
+      c.removeNode('d');
+      expect(c.nodeById('d'), isNull);
+      expect(c.data.length, 3);
+      expect(changed!.any((r) => r.id == 'd'), isFalse);
+    });
+
+    test('mid-tree removal promotes children to the grandparent', () {
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      c.removeNode('c'); // d promotes to a
+      expect(c.nodeById('d')!.parent!.id, 'a');
+      expect(c.data.length, 3);
+    });
+
+    test('root removal promotes children to roots', () {
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      c.removeNode('a');
+      expect(c.nodeById('b')!.parent, isNull);
+      expect(c.nodeById('c')!.parent, isNull);
+      expect(c.nodeById('d')!.parent!.id, 'c'); // grandchildren untouched
+    });
+
+    test('promoted children keep their expansion state', () {
+      final c = make(tree, withParent: rowWithParent);
+      configure(c);
+      c.expand('c'); // d visible
+      c.removeNode('a');
+      expect(c.nodeById('c')!.isExpanded, isTrue);
+      expect(c.state.byId('d'), isNotNull);
+    });
+
+    test('removal with children but no withParent throws StateError', () {
+      final c = make(tree);
+      configure(c);
+      expect(() => c.removeNode('c'), throwsStateError);
+      expect(c.nodeById('c'), isNotNull);
+      expect(c.data.length, 4);
+    });
+
+    test('unknown id throws ArgumentError', () {
+      final c = make(tree);
+      configure(c);
+      expect(() => c.removeNode('ghost'), throwsArgumentError);
+    });
+  });
 }
