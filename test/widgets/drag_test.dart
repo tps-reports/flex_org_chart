@@ -153,4 +153,149 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
+
+  testWidgets('drag over a valid target shows the drop overlay', (
+    tester,
+  ) async {
+    final c = makeController();
+    await tester.pumpWidget(app(c, onReparent: (_, __) {}));
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('drop-target-b')), findsOneWidget);
+    await g.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('drop on a valid target fires onReparent with the right pair', (
+    tester,
+  ) async {
+    final c = makeController();
+    (String, String)? fired;
+    await tester.pumpWidget(
+      app(c, onReparent: (node, newParent) => fired = (node.id, newParent.id)),
+    );
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+    expect(fired, ('d', 'b'));
+    expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+  });
+
+  testWidgets('app applying the drop via setData animates and preserves view', (
+    tester,
+  ) async {
+    var data = List.of(rows);
+    final c = makeController(data);
+    await tester.pumpWidget(
+      app(
+        c,
+        onReparent: (node, newParent) {
+          data = [
+            for (final r in data)
+              r.id == node.id ? (id: r.id, parentId: newParent.id) : r,
+          ];
+          c.setData(data);
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    await g.up();
+    await tester.pumpAndSettle();
+    // d survived the setData and is now under b.
+    expect(c.nodeById('d')!.parent!.id, 'b');
+    expect(find.text('node-d'), findsOneWidget);
+  });
+
+  testWidgets('drop on own descendant snaps back, no callback', (tester) async {
+    final c = makeController();
+    var fired = false;
+    await tester.pumpWidget(app(c, onReparent: (_, __) => fired = true));
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-c'); // c's descendant is d
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-d'))));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('drop-target-d')), findsNothing);
+    await g.up();
+    await tester.pump();
+    expect(fired, isFalse);
+    // Ghost still present, snapping back...
+    expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+  });
+
+  testWidgets('drop on empty space snaps back, no callback', (tester) async {
+    final c = makeController();
+    var fired = false;
+    await tester.pumpWidget(app(c, onReparent: (_, __) => fired = true));
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveBy(const Offset(250, 250)); // off into empty canvas
+    await tester.pump();
+    await g.up();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(fired, isFalse);
+    expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+  });
+
+  testWidgets('canReparent veto: no overlay, drop snaps back', (tester) async {
+    final c = makeController();
+    var fired = false;
+    await tester.pumpWidget(
+      app(
+        c,
+        onReparent: (_, __) => fired = true,
+        canReparent: (node, candidate) => candidate.id != 'b',
+      ),
+    );
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('drop-target-b')), findsNothing);
+    await g.up();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(fired, isFalse);
+  });
+
+  testWidgets('setData mid-drag cancels the drag', (tester) async {
+    final c = makeController();
+    var fired = false;
+    await tester.pumpWidget(app(c, onReparent: (_, __) => fired = true));
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+    c.setData(const [(id: 'a', parentId: null), (id: 'b', parentId: 'a')]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(fired, isFalse);
+  });
+
+  testWidgets('release without movement over self is a silent no-op', (
+    tester,
+  ) async {
+    final c = makeController();
+    var fired = false;
+    await tester.pumpWidget(app(c, onReparent: (_, __) => fired = true));
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.up(); // release in place: pointer is over d itself
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pumpAndSettle();
+    expect(fired, isFalse);
+    expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
+  });
 }
