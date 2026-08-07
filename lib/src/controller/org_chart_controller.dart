@@ -73,7 +73,11 @@ class OrgChartController<T> extends ChangeNotifier {
   /// item's id and parent id (a `null`/empty parent id makes an item a
   /// root); nodes at [initialExpandLevel] or shallower start expanded; and
   /// [connections] declares any non-hierarchical links to draw alongside
-  /// the tree.
+  /// the tree. [onDataChanged] fires after every successful editing op with
+  /// the new backing data — wire it to persistence. [withParent] is
+  /// required by [reparent] and by [removeNode]'s child promotion;
+  /// leaf-only editing (no reparenting, no removing a node with children)
+  /// can omit it.
   OrgChartController({
     required List<T> data,
     required this.idOf,
@@ -103,7 +107,7 @@ class OrgChartController<T> extends ChangeNotifier {
 
   /// Returns a copy of [item] with its parent id replaced by
   /// `newParentId` (`null` meaning "make it a root"). Required by
-  /// [reparent] and by [`removeNode`]'s child promotion — the controller
+  /// [reparent] and by [removeNode]'s child promotion — the controller
   /// treats `T` as opaque and cannot write the parent id itself. The
   /// returned item must keep its id; changing it throws [StateError] at
   /// the call site.
@@ -137,7 +141,7 @@ class OrgChartController<T> extends ChangeNotifier {
   List<Connection> get connections => List.unmodifiable(_connections);
 
   /// The controller's current backing data, including the result of any
-  /// editing ops (`addNode`, `removeNode`, `reparent`, `updateNode`), as
+  /// editing ops ([addNode], [removeNode], [reparent], [updateNode]), as
   /// an unmodifiable view. Mutating the list you originally passed in has
   /// no effect — hand changes to [setData] or the editing ops instead.
   List<T> get data => List.unmodifiable(_data);
@@ -238,10 +242,16 @@ class OrgChartController<T> extends ChangeNotifier {
   ///
   /// Throws [ArgumentError] if [item]'s id already exists or its parent id
   /// is unknown; throws [StateError] if the controller is in a data-error
-  /// state ([dataError] non-null). On throw, nothing changes.
+  /// state ([dataError] non-null) or has not yet been configured with an
+  /// `OrgChart` widget (unless starting from empty data). On throw,
+  /// nothing changes.
   void addNode(T item) {
     _assertEditable();
     final id = idOf(item);
+    // `_tree` is null before the first configure(); the `_data.any` scan
+    // is what keeps duplicate detection accurate in that empty-data
+    // pre-configure case, where there is no tree to check against — it is
+    // load-bearing, not redundant with the `_tree?.nodeById` check.
     if (_tree?.nodeById(id) != null || _data.any((e) => idOf(e) == id)) {
       throw ArgumentError('a node with id "$id" already exists');
     }
@@ -258,8 +268,9 @@ class OrgChartController<T> extends ChangeNotifier {
   /// empty. Re-parenting a node onto its current parent is a silent
   /// no-op. Expansion/highlight state survives (same ids).
   ///
-  /// Throws [StateError] if [withParent] was not provided (or if the
-  /// controller is in a data-error state); throws [ArgumentError] for an
+  /// Throws [StateError] if [withParent] was not provided, if the
+  /// controller is in a data-error state, or if it has not yet been
+  /// configured with an `OrgChart` widget; throws [ArgumentError] for an
   /// unknown [id], an unknown non-null [newParentId], or when
   /// [newParentId] is [id] itself or any of its descendants (which would
   /// create a cycle). On throw, nothing changes.
@@ -289,8 +300,9 @@ class OrgChartController<T> extends ChangeNotifier {
   ///
   /// Throws [ArgumentError] on an unknown [id]; throws [StateError] if
   /// the node has children and [withParent] was not provided (a leaf
-  /// removes fine without it), or if the controller is in a data-error
-  /// state. On throw, nothing changes.
+  /// removes fine without it), if the controller is in a data-error
+  /// state, or if it has not yet been configured with an `OrgChart`
+  /// widget. On throw, nothing changes.
   void removeNode(String id) {
     _assertEditable();
     final node = _requireNode(id);
@@ -316,7 +328,8 @@ class OrgChartController<T> extends ChangeNotifier {
   /// Throws [ArgumentError] on an unknown id, or — when the parent id
   /// changed — for the same invalid new parents [reparent] rejects
   /// (unknown, itself, or one of its descendants); throws [StateError]
-  /// in a data-error state. On throw, nothing changes.
+  /// in a data-error state, or if the controller has not yet been
+  /// configured with an `OrgChart` widget. On throw, nothing changes.
   void updateNode(T item) {
     _assertEditable();
     final id = idOf(item);
@@ -384,6 +397,16 @@ class OrgChartController<T> extends ChangeNotifier {
       throw StateError(
         'cannot edit while dataError is set; call setData with valid data '
         'first',
+      );
+    }
+    // Before the first OrgChart configure() there is no stratified tree to
+    // validate ids against — op validation would report false negatives
+    // for ids that exist in the data. Empty data is fine (nothing to
+    // validate); non-empty data without a tree is not yet editable.
+    if (_tree == null && _data.isNotEmpty) {
+      throw StateError(
+        'cannot edit before the controller is configured: build an '
+        'OrgChart with this controller first (or start from empty data)',
       );
     }
   }

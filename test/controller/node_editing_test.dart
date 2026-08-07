@@ -129,6 +129,42 @@ void main() {
     });
   });
 
+  group('pre-configure editing', () {
+    test('all four ops throw StateError before configure() with non-empty '
+        'data, and change nothing', () {
+      var notified = 0;
+      List<Row>? changed;
+      final c = make(
+        tree,
+        withParent: rowWithParent,
+        onDataChanged: (d) => changed = d,
+      );
+      c.addListener(() => notified++);
+
+      expect(() => c.addNode((id: 'e', parentId: 'a')), throwsStateError);
+      expect(() => c.reparent('b', 'c'), throwsStateError);
+      expect(() => c.removeNode('b'), throwsStateError);
+      expect(() => c.updateNode((id: 'b', parentId: 'a')), throwsStateError);
+
+      expect(c.data.map((r) => r.id), ['a', 'b', 'c', 'd']);
+      expect(notified, 0);
+      expect(changed, isNull);
+    });
+
+    test(
+      'addNode succeeds before configure() when starting from empty data',
+      () {
+        List<Row>? changed;
+        final c = make(const [], onDataChanged: (d) => changed = d);
+        c.addNode((id: 'r', parentId: null));
+        expect(c.data.length, 1);
+        expect(c.data.single.id, 'r');
+        expect(changed, isNotNull);
+        expect(changed!.single.id, 'r');
+      },
+    );
+  });
+
   group('reparent', () {
     test('moves a subtree and preserves its expansion', () {
       List<Row>? changed;
@@ -242,17 +278,41 @@ void main() {
     });
 
     test('removal with children but no withParent throws StateError', () {
-      final c = make(tree);
+      var notified = 0;
+      List<Row>? changed;
+      final c = make(tree, onDataChanged: (d) => changed = d);
       configure(c);
+      c.addListener(() => notified++);
       expect(() => c.removeNode('c'), throwsStateError);
       expect(c.nodeById('c'), isNotNull);
       expect(c.data.length, 4);
+      expect(notified, 0);
+      expect(changed, isNull);
     });
 
     test('unknown id throws ArgumentError', () {
       final c = make(tree);
       configure(c);
       expect(() => c.removeNode('ghost'), throwsArgumentError);
+    });
+
+    test('removing the last node empties the chart cleanly', () {
+      List<Row>? changed;
+      final c = make(const [
+        (id: 'only', parentId: null),
+      ], onDataChanged: (d) => changed = d);
+      configure(c);
+      c.removeNode('only');
+      expect(c.state.nodes, isEmpty);
+      expect(c.dataError, isNull);
+      expect(c.data, isEmpty);
+      expect(changed, isNotNull);
+      expect(changed, isEmpty);
+
+      // addNode repopulates from empty.
+      c.addNode((id: 'again', parentId: null));
+      expect(c.data.single.id, 'again');
+      expect(c.state.byId('again'), isNotNull);
     });
   });
 
@@ -317,12 +377,17 @@ void main() {
     });
 
     test('unknown id throws ArgumentError, nothing changes', () {
-      final c = makeNamed();
+      var notified = 0;
+      List<({String id, String? parentId, String name})>? changed;
+      final c = makeNamed(onDataChanged: (d) => changed = d);
+      c.addListener(() => notified++);
       expect(
         () => c.updateNode((id: 'ghost', parentId: null, name: 'X')),
         throwsArgumentError,
       );
       expect(c.data.length, 4);
+      expect(notified, 0);
+      expect(changed, isNull);
     });
   });
 }
