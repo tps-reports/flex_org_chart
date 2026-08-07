@@ -73,8 +73,9 @@ class DemoApp extends StatefulWidget {
 }
 
 class _DemoAppState extends State<DemoApp> {
+  var _employees = employees;
   late final controller = OrgChartController<Employee>(
-    data: employees,
+    data: _employees,
     idOf: (e) => e.id,
     parentIdOf: (e) => e.managerId,
     // Expand down through the VPs so the compact folding under VP
@@ -237,6 +238,22 @@ class _DemoAppState extends State<DemoApp> {
                 ),
                 onZoom: (scale) =>
                     _setStatus('Zoom: ${scale.toStringAsFixed(2)}x'),
+                onReparent: (node, newParent) {
+                  setState(() {
+                    _employees = [
+                      for (final e in _employees)
+                        if (e.id == node.data.id)
+                          Employee(e.id, newParent.data.id, e.name, e.title)
+                        else
+                          e,
+                    ];
+                  });
+                  controller.setData(_employees);
+                  _setStatus(
+                    'Moved ${node.data.name} to report to '
+                    '${newParent.data.name}.',
+                  );
+                },
                 connectionStyle: const ConnectionStyle(
                   color: Color(0xFF7C4DFF),
                   width: 2,

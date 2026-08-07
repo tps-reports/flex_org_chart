@@ -1,3 +1,16 @@
+## 0.2.0
+
+- **Drag-and-drop re-parenting** (opt-in): long-press a node to lift it,
+  drop it on its new parent. `OrgChart.onReparent` receives
+  `(node, newParent)`; the app applies the change and calls `setData`.
+  `OrgChart.canReparent` vetoes targets beyond the built-in
+  self/descendant cycle rule; `OrgChart.dropTargetBuilder` customizes the
+  valid-target overlay.
+- **Behavior change**: `OrgChartController.setData` now preserves
+  expansion and highlight state for node ids that survive into the new
+  data (`preserveState: true` by default). Pass `preserveState: false`
+  for the previous reset-everything behavior.
+
 ## 0.1.0
 
 Initial release. A highly customizable, animated org chart widget for

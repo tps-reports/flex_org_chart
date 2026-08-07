@@ -59,6 +59,27 @@ controller.centerNode('2');
 controller.expandAll();
 ```
 
+Drag-and-drop re-parenting is opt-in — provide `onReparent`, apply the
+change to your data, and call `setData` (which preserves expansion state
+by default, so the moved subtree animates to its new parent):
+
+```dart
+OrgChart<Employee>(
+  controller: controller,
+  nodeBuilder: ...,
+  onReparent: (node, newParent) {
+    myData = reassignManager(myData, node.id, newParent.id);
+    controller.setData(myData);
+  },
+  // Optional: veto targets beyond the built-in cycle rule.
+  canReparent: (node, candidate) => candidate.data.role != 'contractor',
+);
+```
+
+Long-press (~500ms) lifts a node; a quick drag still pans the canvas.
+Dropping on the node's own subtree, on empty space, or on a vetoed
+target snaps back and calls nothing.
+
 ## Features
 
 | Feature | flex_org_chart | d3-org-chart |
@@ -74,7 +95,7 @@ controller.expandAll();
 | Animated layout transitions | done | done |
 | Non-hierarchical connections (dashed, labeled) | done | done |
 | Data validation (cycles, missing parents, dup ids) | done (`OrgChartDataException`) | partial (throws generic errors) |
-| Drag-and-drop re-parenting | roadmap | done |
+| Drag-and-drop re-parenting | done (long-press to lift) | done |
 | Node editing (add/remove/re-parent via API) | roadmap | done |
 | Department bounding boxes (group nodes by subtree) | roadmap | — |
 | Image / PDF export | roadmap | done |
