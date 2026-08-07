@@ -307,6 +307,34 @@ class OrgChartController<T> extends ChangeNotifier {
     _notifyDataChanged();
   }
 
+  /// Replaces the item whose id matches [item]'s id, wholesale. If the
+  /// replacement's parent id (per [parentIdOf]) differs from the current
+  /// one, that is honored — a combined update+reparent. [withParent] is
+  /// not needed: the caller already wrote the parent id into [item].
+  /// Expansion/highlight state survives (same id).
+  ///
+  /// Throws [ArgumentError] on an unknown id, or — when the parent id
+  /// changed — for the same invalid new parents [reparent] rejects
+  /// (unknown, itself, or one of its descendants); throws [StateError]
+  /// in a data-error state. On throw, nothing changes.
+  void updateNode(T item) {
+    _assertEditable();
+    final id = idOf(item);
+    final node = _requireNode(id);
+    final currentParentId = parentIdOf(node.data);
+    final newParentId = parentIdOf(item);
+    final normalizedNew = _isRootId(newParentId) ? null : newParentId;
+    final normalizedCurrent = _isRootId(currentParentId)
+        ? null
+        : currentParentId;
+    if (normalizedNew != normalizedCurrent) {
+      _assertValidNewParent(node, normalizedNew);
+    }
+    final newData = [for (final e in _data) idOf(e) == id ? item : e];
+    _applyData(newData, preserveState: true);
+    _notifyDataChanged();
+  }
+
   OrgNode<T> _requireNode(String id) {
     final node = _tree?.nodeById(id);
     if (node == null) {

@@ -255,4 +255,72 @@ void main() {
       expect(() => c.removeNode('ghost'), throwsArgumentError);
     });
   });
+
+  group('updateNode', () {
+    // (id, parentId, name) — name is the editable payload.
+    List<({String id, String? parentId, String name})> named() => const [
+      (id: 'a', parentId: null, name: 'Ada'),
+      (id: 'b', parentId: 'a', name: 'Bob'),
+      (id: 'c', parentId: 'a', name: 'Cal'),
+      (id: 'd', parentId: 'c', name: 'Dee'),
+    ];
+    OrgChartController<({String id, String? parentId, String name})> makeNamed({
+      void Function(List<({String id, String? parentId, String name})>)?
+      onDataChanged,
+    }) {
+      final c = OrgChartController(
+        data: named(),
+        idOf: (r) => r.id,
+        parentIdOf: (r) => r.parentId,
+        onDataChanged: onDataChanged,
+      );
+      c.configure(
+        OrgChartConfig(
+          layout: ChartLayout.top,
+          compact: false,
+          spacing: const ChartSpacing(),
+          nodeSize: (_) => (w: 100, h: 50),
+        ),
+      );
+      return c;
+    }
+
+    test('replaces the payload in place', () {
+      List<({String id, String? parentId, String name})>? changed;
+      final c = makeNamed(onDataChanged: (d) => changed = d);
+      c.updateNode((id: 'b', parentId: 'a', name: 'Bobby'));
+      expect(c.nodeById('b')!.data.name, 'Bobby');
+      expect(c.nodeById('b')!.parent!.id, 'a');
+      expect(changed!.firstWhere((r) => r.id == 'b').name, 'Bobby');
+    });
+
+    test('combined update+reparent is honored and validated', () {
+      final c = makeNamed();
+      c.updateNode((id: 'd', parentId: 'b', name: 'Dee'));
+      expect(c.nodeById('d')!.parent!.id, 'b');
+      // Cycle via updateNode is rejected like reparent:
+      expect(
+        () => c.updateNode((id: 'c', parentId: 'd', name: 'Cal')),
+        throwsArgumentError,
+      );
+    });
+
+    test('expansion and highlight survive an update', () {
+      final c = makeNamed();
+      c.expand('c');
+      c.highlight('c');
+      c.updateNode((id: 'c', parentId: 'a', name: 'Calvin'));
+      expect(c.nodeById('c')!.isExpanded, isTrue);
+      expect(c.nodeById('c')!.isHighlighted, isTrue);
+    });
+
+    test('unknown id throws ArgumentError, nothing changes', () {
+      final c = makeNamed();
+      expect(
+        () => c.updateNode((id: 'ghost', parentId: null, name: 'X')),
+        throwsArgumentError,
+      );
+      expect(c.data.length, 4);
+    });
+  });
 }
