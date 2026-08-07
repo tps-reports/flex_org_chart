@@ -218,6 +218,18 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   /// playing). All coordinates in layout space; see drag_reparent.dart.
   DragState<T>? _drag;
 
+  /// True only while a finger/pointer is actually down and driving [_drag]
+  /// — from [_startDrag] until [_endDrag]/[_cancelDrag] — as opposed to
+  /// [_drag] itself, which stays non-null through the passive ~150ms
+  /// snap-back after the pointer has already lifted. [ChartViewport] is
+  /// suppressed on this flag, not on `_drag != null`: gating on `_drag`
+  /// would leave the viewport disabled for the whole snap-back window even
+  /// though there is no pointer left to fight, so a pan gesture started
+  /// during that window would find `enabled` still false at `onScaleStart`
+  /// and never snapshot its own gesture-start transform — leaving it dead
+  /// for the rest of that gesture even after `enabled` later flips true.
+  bool _dragPointerActive = false;
+
   /// Drives the ~150ms ghost snap-back after an invalid drop. Constructed
   /// eagerly in initState for the same disposal-safety reason as
   /// _viewportAnim/_layoutAnim (see their comments).
@@ -582,6 +594,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           rect.top + localPosition.dy,
         ),
       );
+      _dragPointerActive = true;
     });
   }
 
@@ -618,10 +631,17 @@ class _OrgChartState<T> extends State<OrgChart<T>>
         ? null
         : widget.controller.nodeById(targetId);
     if (target != null) {
-      setState(() => _drag = null);
+      setState(() {
+        _drag = null;
+        _dragPointerActive = false;
+      });
       widget.onReparent?.call(drag.node, target);
     } else {
-      // Invalid drop: snap the ghost back to where the node lives.
+      // Invalid drop: snap the ghost back to where the node lives. The
+      // pointer is already gone at this point — only _drag stays non-null
+      // (to drive the snap-back lerp below); re-enable the viewport for it
+      // right away rather than waiting out the ~150ms animation.
+      setState(() => _dragPointerActive = false);
       _snapFrom = drag.ghostTopLeft;
       _snapBack.forward(from: 0);
     }
@@ -636,6 +656,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     setState(() {
       _drag = null;
       _snapFrom = null;
+      _dragPointerActive = false;
     });
   }
 
@@ -901,10 +922,15 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           // ticking and fight the gesture (stop() fires the tween's
           // whenCompleteOrCancel, detaching its tick listener).
           onInteractionStart: () => _viewportAnim.stop(),
-          // Suppressed while a drag is in flight: a second pointer panning
-          // or pinching would invalidate the drag's frozen coordinate
-          // transform (see ChartViewport.enabled's own doc).
-          enabled: _drag == null,
+          // Suppressed only while a pointer is actively driving a drag —
+          // not merely while _drag is non-null, which also covers the
+          // passive ~150ms snap-back after the pointer has already lifted
+          // (see _dragPointerActive's doc: gating on _drag itself would
+          // leave a pan gesture started during that window dead for its
+          // whole remaining duration). A second pointer panning or
+          // pinching mid-drag would invalidate the drag's frozen
+          // coordinate transform (see ChartViewport.enabled's own doc).
+          enabled: !_dragPointerActive,
           child: content,
         );
       },

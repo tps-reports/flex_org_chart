@@ -117,4 +117,40 @@ void main() {
     expect(after, isNot(equals(before)));
     expect(find.byKey(const ValueKey('drag-ghost')), findsNothing);
   });
+
+  testWidgets(
+    'a pan started during the post-drop snap-back window still works',
+    (tester) async {
+      final c = makeController();
+      await tester.pumpWidget(app(c, onReparent: (_, __) {}));
+      await tester.pumpAndSettle();
+
+      // Lift node-d and drop it far off any node, so the drop is invalid
+      // and kicks off the ~150ms ghost snap-back (_drag stays non-null
+      // for that whole window, even though the pointer is already gone).
+      final g = await lift(tester, 'node-d');
+      await g.moveBy(const Offset(-2000, -2000));
+      await tester.pump();
+      await g.up();
+      // Applies _endDrag()'s setState (which flips _dragPointerActive to
+      // false) without waiting out the snap-back animation itself — a
+      // bare pump(), not pumpAndSettle(), so the snap-back is still
+      // in-flight (_drag != null) for the rest of this test.
+      await tester.pump();
+      expect(find.byKey(const ValueKey('drag-ghost')), findsOneWidget);
+
+      // A brand new pan, started on empty space while the snap-back is
+      // still playing, must take effect immediately — not be silently
+      // eaten for the whole remaining snap-back duration.
+      final before = tester.getTopLeft(find.byKey(const ValueKey('node-a')));
+      final g2 = await tester.startGesture(const Offset(2, 2));
+      await g2.moveBy(const Offset(40, 30));
+      await tester.pump();
+      final after = tester.getTopLeft(find.byKey(const ValueKey('node-a')));
+      expect(after, isNot(equals(before)));
+
+      await g2.up();
+      await tester.pumpAndSettle();
+    },
+  );
 }
