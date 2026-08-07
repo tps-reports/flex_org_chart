@@ -74,14 +74,15 @@ controller.expandAll();
 | Animated layout transitions | done | done |
 | Non-hierarchical connections (dashed, labeled) | done | done |
 | Data validation (cycles, missing parents, dup ids) | done (`OrgChartDataException`) | partial (throws generic errors) |
-| Node editing (add/remove/re-parent via UI) | roadmap | done |
-| Image / PDF export | roadmap | done |
-| Pagination for very large trees | roadmap | done |
 | Drag-and-drop re-parenting | roadmap | done |
+| Node editing (add/remove/re-parent via API) | roadmap | done |
+| Department bounding boxes (group nodes by subtree) | roadmap | — |
+| Image / PDF export | roadmap | done |
 
 Rows marked **roadmap** are **not implemented** in this release — there is no
-partial or hidden support for them. If your use case depends on one of them,
-this package isn't ready for it yet.
+partial or hidden support for them — and are listed in planned build order.
+If your use case depends on one of them, this package isn't ready for it yet.
+d3-org-chart's pagination for very large trees is not planned.
 
 ## Example
 
