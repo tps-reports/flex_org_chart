@@ -80,6 +80,7 @@ class OrgChartController<T> extends ChangeNotifier {
     required this.parentIdOf,
     this.initialExpandLevel = 1,
     List<Connection> connections = const [],
+    this.onDataChanged,
   }) : _data = List.of(data),
        _connections = List.of(connections);
 
@@ -91,6 +92,13 @@ class OrgChartController<T> extends ChangeNotifier {
 
   /// Depth (root = 0) at or above which nodes start expanded.
   final int initialExpandLevel;
+
+  /// Called after every successful editing op ([addNode], [removeNode],
+  /// [reparent], [updateNode]) with the new backing list — the same
+  /// unmodifiable view [data] returns. The persistence hook: save here
+  /// and every programmatic or drag-driven edit reaches your backend.
+  /// Never fired by [setData]; the app initiated that change itself.
+  final void Function(List<T> data)? onDataChanged;
 
   List<T> _data;
   final List<Connection> _connections;
@@ -211,6 +219,43 @@ class OrgChartController<T> extends ChangeNotifier {
     }
     _relayout();
   }
+
+  // ---- editing ----
+
+  /// Adds [item] to the chart. Its parent (per [parentIdOf]) must already
+  /// exist; a `null`/empty parent id adds a new root. The new node follows
+  /// normal visibility rules — it is hidden if its parent is collapsed
+  /// (the parent is not auto-expanded).
+  ///
+  /// Throws [ArgumentError] if [item]'s id already exists or its parent id
+  /// is unknown; throws [StateError] if the controller is in a data-error
+  /// state ([dataError] non-null). On throw, nothing changes.
+  void addNode(T item) {
+    _assertEditable();
+    final id = idOf(item);
+    if (_tree?.nodeById(id) != null || _data.any((e) => idOf(e) == id)) {
+      throw ArgumentError('a node with id "$id" already exists');
+    }
+    final parentId = parentIdOf(item);
+    if (!_isRootId(parentId) && _tree?.nodeById(parentId!) == null) {
+      throw ArgumentError('parent id "$parentId" does not exist');
+    }
+    _applyData([..._data, item], preserveState: true);
+    _notifyDataChanged();
+  }
+
+  void _assertEditable() {
+    if (_dataError != null) {
+      throw StateError(
+        'cannot edit while dataError is set; call setData with valid data '
+        'first',
+      );
+    }
+  }
+
+  bool _isRootId(String? id) => id == null || id.isEmpty;
+
+  void _notifyDataChanged() => onDataChanged?.call(data);
 
   // ---- expansion ----
 
