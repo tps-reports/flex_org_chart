@@ -1,3 +1,18 @@
+## 0.3.0
+
+- **Node editing API**: `addNode`, `removeNode` (children promote to the
+  removed node's parent), `reparent` (cycle-safe), and `updateNode` on
+  `OrgChartController`, plus a `data` getter. Ops validate up front and
+  throw (`ArgumentError`/`StateError`) before mutating anything; every
+  successful edit animates like a drag-drop confirmation.
+- **New controller callbacks**: `withParent` teaches the controller to
+  write a parent id into your items (required by `reparent` and child
+  promotion); `onDataChanged` fires after every successful edit with the
+  new list — the persistence hook. `setData` never fires it.
+- The example app's drag-and-drop now delegates to
+  `controller.reparent(...)` — one line instead of hand-rolled list
+  surgery.
+
 ## 0.2.0
 
 - **Drag-and-drop re-parenting** (opt-in): long-press a node to lift it,

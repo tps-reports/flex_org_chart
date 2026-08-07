@@ -90,6 +90,9 @@ class _DemoAppState extends State<DemoApp> {
       Connection(from: '7', to: '8', label: 'shared ledger'),
       Connection(from: '5', to: '17', label: 'infra pairing'),
     ],
+    withParent: (e, newManagerId) =>
+        Employee(e.id, newManagerId, e.name, e.title),
+    onDataChanged: (data) => _employees = List.of(data),
   );
 
   var _layout = ChartLayout.top;
@@ -239,16 +242,7 @@ class _DemoAppState extends State<DemoApp> {
                 onZoom: (scale) =>
                     _setStatus('Zoom: ${scale.toStringAsFixed(2)}x'),
                 onReparent: (node, newParent) {
-                  setState(() {
-                    _employees = [
-                      for (final e in _employees)
-                        if (e.id == node.data.id)
-                          Employee(e.id, newParent.data.id, e.name, e.title)
-                        else
-                          e,
-                    ];
-                  });
-                  controller.setData(_employees);
+                  controller.reparent(node.id, newParent.id);
                   _setStatus(
                     'Moved ${node.data.name} to report to '
                     '${newParent.data.name}.',

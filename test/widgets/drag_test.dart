@@ -392,4 +392,41 @@ void main() {
     await tester.pump();
     expect(fired, ('d', 'b'));
   });
+
+  testWidgets('drag-and-drop delegating to controller.reparent works', (
+    tester,
+  ) async {
+    List<Row>? saved;
+    final c = OrgChartController<Row>(
+      data: rows,
+      idOf: (r) => r.id,
+      parentIdOf: (r) => r.parentId,
+      initialExpandLevel: 2,
+      withParent: (r, p) => (id: r.id, parentId: p),
+      onDataChanged: (d) => saved = d,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: OrgChart<Row>(
+            controller: c,
+            compact: false,
+            nodeSize: (_) => (w: 100, h: 50),
+            onReparent: (node, newParent) => c.reparent(node.id, newParent.id),
+            nodeBuilder: (context, node) =>
+                Text('node-${node.id}', key: ValueKey('node-${node.id}')),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final g = await lift(tester, 'node-d');
+    await g.moveTo(tester.getCenter(find.byKey(const ValueKey('node-b'))));
+    await tester.pump();
+    await g.up();
+    await tester.pumpAndSettle();
+    expect(c.nodeById('d')!.parent!.id, 'b');
+    expect(saved!.firstWhere((r) => r.id == 'd').parentId, 'b');
+    c.dispose();
+  });
 }

@@ -80,6 +80,24 @@ Long-press (~500ms) lifts a node; a quick drag still pans the canvas.
 Dropping on the node's own subtree, on empty space, or on a vetoed
 target snaps back and calls nothing.
 
+Programmatic editing goes through the controller — every op animates and
+fires `onDataChanged` for persistence:
+
+```dart
+final controller = OrgChartController<Employee>(
+  data: employees,
+  idOf: (e) => e.id,
+  parentIdOf: (e) => e.managerId,
+  withParent: (e, id) => e.copyWith(managerId: id), // enables reparent/promotion
+  onDataChanged: (data) => api.save(data),
+);
+
+controller.addNode(newHire);          // parent must exist
+controller.reparent('7', '2');        // cycle-safe; drag-drop can delegate here
+controller.removeNode('4');           // children promote to the grandparent
+controller.updateNode(renamedPerson); // same id, new payload
+```
+
 ## Features
 
 | Feature | flex_org_chart | d3-org-chart |
@@ -96,7 +114,7 @@ target snaps back and calls nothing.
 | Non-hierarchical connections (dashed, labeled) | done | done |
 | Data validation (cycles, missing parents, dup ids) | done (`OrgChartDataException`) | partial (throws generic errors) |
 | Drag-and-drop re-parenting | done (long-press to lift) | done |
-| Node editing (add/remove/re-parent via API) | roadmap | done |
+| Node editing (add/remove/re-parent via API) | done | done |
 | Department bounding boxes (group nodes by subtree) | roadmap | — |
 | Image / PDF export | roadmap | done |
 
