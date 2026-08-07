@@ -119,6 +119,12 @@ class OrgChartController<T> extends ChangeNotifier {
   /// constructor.
   List<Connection> get connections => List.unmodifiable(_connections);
 
+  /// The controller's current backing data, including the result of any
+  /// editing ops (`addNode`, `removeNode`, `reparent`, `updateNode`), as
+  /// an unmodifiable view. Mutating the list you originally passed in has
+  /// no effect — hand changes to [setData] or the editing ops instead.
+  List<T> get data => List.unmodifiable(_data);
+
   /// The [OrgNode] wrapping every currently visible node's data, in the
   /// order they appear in [state]. Each entry's `.data` is the original
   /// item passed to the constructor/[setData], not the item itself.
@@ -170,7 +176,14 @@ class OrgChartController<T> extends ChangeNotifier {
   /// the new data keep their expansion and highlight flags; only new ids
   /// get the [initialExpandLevel] rule. Pass false to reset every node's
   /// state exactly as the constructor does — the pre-0.2 behavior.
-  void setData(List<T> data, {bool preserveState = true}) {
+  void setData(List<T> data, {bool preserveState = true}) =>
+      _applyData(data, preserveState: preserveState);
+
+  /// The single mutation path shared by [setData] and the editing ops
+  /// (`addNode`, `removeNode`, `reparent`, `updateNode`): capture
+  /// expansion/highlight flags, swap the data, re-stratify, restore flags
+  /// by surviving id, relayout.
+  void _applyData(List<T> newData, {required bool preserveState}) {
     Map<String, ({bool expanded, bool highlighted, bool onPath})>? saved;
     final oldTree = _tree;
     if (preserveState && oldTree != null) {
@@ -183,7 +196,7 @@ class OrgChartController<T> extends ChangeNotifier {
           ),
       };
     }
-    _data = List.of(data);
+    _data = List.of(newData);
     _tree = null;
     _rebuildTreeIfNeeded();
     final newTree = _tree;
