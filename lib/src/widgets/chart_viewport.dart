@@ -16,6 +16,7 @@ class ChartViewport extends StatefulWidget {
     this.scaleExtent = const (0.001, 20.0),
     this.onZoom,
     this.onInteractionStart,
+    this.enabled = true,
   });
 
   final Widget child;
@@ -39,6 +40,13 @@ class ChartViewport extends StatefulWidget {
   /// programmatic viewport animation so its tween doesn't keep ticking and
   /// fight the user's gesture for control of [transformationController].
   final VoidCallback? onInteractionStart;
+
+  /// When false, pan/pinch/scroll gestures are ignored entirely — the
+  /// transform can only change programmatically. The owning `OrgChart`
+  /// disables the viewport while a drag-to-reparent is in flight so a
+  /// second pointer can't pan or zoom under the drag (which would
+  /// invalidate the gesture's frozen coordinate transform).
+  final bool enabled;
 
   @override
   State<ChartViewport> createState() => _ChartViewportState();
@@ -114,6 +122,7 @@ class _ChartViewportState extends State<ChartViewport> {
   Widget build(BuildContext context) {
     return Listener(
       onPointerSignal: (event) {
+        if (!widget.enabled) return;
         if (event is PointerScrollEvent) {
           widget.onInteractionStart?.call();
           final factor = event.scrollDelta.dy < 0 ? 1.1 : 1 / 1.1;
@@ -123,6 +132,7 @@ class _ChartViewportState extends State<ChartViewport> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onScaleStart: (details) {
+          if (!widget.enabled) return;
           // Must run before the transform snapshot below: stopping an
           // in-flight programmatic animation may not change _tc.value, but
           // ordering it first guarantees the snapshot is taken from a
@@ -131,7 +141,10 @@ class _ChartViewportState extends State<ChartViewport> {
           _gestureStart = _tc.value.clone();
           _focalStart = details.localFocalPoint;
         },
-        onScaleUpdate: _composeGesture,
+        onScaleUpdate: (details) {
+          if (!widget.enabled) return;
+          _composeGesture(details);
+        },
         onScaleEnd: (_) {
           _gestureStart = null;
           _focalStart = null;

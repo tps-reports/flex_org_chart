@@ -318,4 +318,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(tc.value, equals(target));
   });
+
+  testWidgets('enabled: false ignores pan and scroll', (tester) async {
+    final tc = TransformationController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChartViewport(
+          transformationController: tc,
+          enabled: false,
+          child: const SizedBox(width: 2000, height: 2000),
+        ),
+      ),
+    );
+    final before = tc.value.clone();
+    final g = await tester.startGesture(const Offset(200, 200));
+    await g.moveBy(const Offset(80, 40));
+    await g.up();
+    await tester.pump();
+    expect(tc.value, before);
+    tc.dispose();
+  });
 }
