@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../controller/org_chart_controller.dart';
 import '../layout/layout_engine.dart';
@@ -9,6 +10,7 @@ import '../model/org_chart_data_exception.dart';
 import '../model/org_node.dart';
 import 'chart_viewport.dart';
 import 'connection_painter.dart';
+import 'drag_reparent.dart';
 import 'edge_painter.dart';
 import 'expand_button.dart';
 import 'viewport_math.dart';
@@ -51,6 +53,9 @@ class OrgChart<T> extends StatefulWidget {
     this.emptyBuilder,
     this.scaleExtent = const (0.001, 20.0),
     this.onZoom,
+    this.onReparent,
+    this.canReparent,
+    this.dropTargetBuilder,
   });
 
   /// Owns the chart's data and derived layout. Must be configured by this
@@ -134,6 +139,28 @@ class OrgChart<T> extends StatefulWidget {
   /// this — observe [controller] if you need to react to those too.
   final void Function(double scale)? onZoom;
 
+  /// Called when the user drops a dragged node onto a valid new parent.
+  /// Non-null enables drag-and-drop re-parenting: long-press a node
+  /// (~500ms) to lift it, drag, and drop it onto the node that should
+  /// become its parent. The chart never mutates data itself — update your
+  /// data source here and call [OrgChartController.setData] (which
+  /// preserves expansion state by default, so the moved subtree animates
+  /// to its new parent). If you do nothing, the chart stays as it was.
+  final void Function(OrgNode<T> node, OrgNode<T> newParent)? onReparent;
+
+  /// Optional veto on drop targets, beyond the built-in rule that a node
+  /// can never be dropped onto itself or its own descendants. Candidates
+  /// failing it are treated exactly like empty space: no highlight while
+  /// hovering, and dropping snaps the node back. Only consulted when
+  /// [onReparent] is non-null.
+  final bool Function(OrgNode<T> node, OrgNode<T> candidateParent)? canReparent;
+
+  /// Overrides the overlay drawn on top of the node currently under a
+  /// drag when it is a valid drop target. Defaults to a rounded border in
+  /// [highlightedLinkStyle]'s color. Only consulted when [onReparent] is
+  /// non-null.
+  final Widget Function(BuildContext, OrgNode<T>)? dropTargetBuilder;
+
   @override
   State<OrgChart<T>> createState() => _OrgChartState<T>();
 }
@@ -187,6 +214,18 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   /// [ChartState] — schedules the one-time initial `fit` (see [build]).
   bool _needsInitialFit = true;
 
+  /// Non-null while a drag-to-reparent is in flight (or snap-back is
+  /// playing). All coordinates in layout space; see drag_reparent.dart.
+  DragState<T>? _drag;
+
+  /// Drives the ~150ms ghost snap-back after an invalid drop. Constructed
+  /// eagerly in initState for the same disposal-safety reason as
+  /// _viewportAnim/_layoutAnim (see their comments).
+  late final AnimationController _snapBack;
+
+  /// Where the ghost was released, frozen for the snap-back lerp.
+  Offset? _snapFrom;
+
   @override
   void initState() {
     super.initState();
@@ -200,6 +239,19 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     );
     _t = CurvedAnimation(parent: _layoutAnim, curve: Curves.easeInOut);
     _layoutAnim.addStatusListener(_onLayoutAnimStatus);
+    _snapBack = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _snapBack.addListener(() => setState(() {}));
+    _snapBack.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() {
+          _drag = null;
+          _snapFrom = null;
+        });
+      }
+    });
     _configure();
     // Seed the snapshot to the controller's freshly-computed initial state
     // (rather than leaving it at ChartState.empty) so the very first notify
@@ -215,6 +267,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   void didUpdateWidget(OrgChart<T> old) {
     super.didUpdateWidget(old);
     final controllerChanged = !identical(old.controller, widget.controller);
+    if (controllerChanged || widget.onReparent == null) _cancelDrag();
     if (controllerChanged) {
       old.controller.removeListener(_onChanged);
       old.controller.detachViewport(this);
@@ -255,6 +308,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     _viewportAnim.dispose();
     _t.dispose();
     _layoutAnim.dispose();
+    _snapBack.dispose();
     super.dispose();
   }
 
@@ -298,23 +352,32 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   }
 
   @override
-  void fitBounds(LayoutRect bounds, {bool animate = true}) => _animateTo(
-    fitTransform(bounds: _shifted(bounds), viewport: _viewportSize),
-    animate: animate,
-  );
+  void fitBounds(LayoutRect bounds, {bool animate = true}) {
+    // A programmatic viewport change mid-drag invalidates the frozen
+    // gesture transform the drag's coordinate math relies on.
+    _cancelDrag();
+    _animateTo(
+      fitTransform(bounds: _shifted(bounds), viewport: _viewportSize),
+      animate: animate,
+    );
+  }
 
   @override
-  void centerOn(LayoutRect rect, {bool animate = true}) => _animateTo(
-    centerTransform(
-      rect: _shifted(rect),
-      viewport: _viewportSize,
-      scale: _tc.value.getMaxScaleOnAxis(),
-    ),
-    animate: animate,
-  );
+  void centerOn(LayoutRect rect, {bool animate = true}) {
+    _cancelDrag();
+    _animateTo(
+      centerTransform(
+        rect: _shifted(rect),
+        viewport: _viewportSize,
+        scale: _tc.value.getMaxScaleOnAxis(),
+      ),
+      animate: animate,
+    );
+  }
 
   @override
   void zoomBy(double factor) {
+    _cancelDrag();
     // Like _animateTo and ChartViewport's onInteractionStart: this writes
     // _tc.value directly, so any in-flight fit/center tween must be stopped
     // first or its still-attached tick listener wipes the zoom back onto
@@ -411,6 +474,7 @@ class _OrgChartState<T> extends State<OrgChart<T>>
   // *next* redundant notify compares equal and does nothing.
   void _onChanged() {
     if (!mounted) return;
+    if (_drag != null) _cancelDrag();
     final next = widget.controller.state;
     if (ChartState.layoutDiffers(_animNext, next)) {
       // Snapshot *before* mutating _animNext — used as the "from" anchor by
@@ -497,6 +561,97 @@ class _OrgChartState<T> extends State<OrgChart<T>>
     widget.onExpandToggle?.call(node, expanding);
   }
 
+  // ---- drag-to-reparent (Task 4) ----
+
+  bool get _dragEnabled => widget.onReparent != null;
+
+  void _startDrag(OrgNode<T> node, LayoutRect rect, Offset localPosition) {
+    // Never lift mid layout-animation: rendered positions are mid-lerp and
+    // would disagree with the state rects target resolution scans.
+    if (!_dragEnabled || _layoutAnim.isAnimating || _snapBack.isAnimating) {
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      _drag = DragState<T>(
+        node: node,
+        sourceRect: rect,
+        grabOffset: localPosition,
+        position: Offset(
+          rect.left + localPosition.dx,
+          rect.top + localPosition.dy,
+        ),
+      );
+    });
+  }
+
+  void _updateDrag(Offset localPosition) {
+    final drag = _drag;
+    if (drag == null || _snapBack.isAnimating) return;
+    // localPosition is relative to the dragged node's wrapper, whose
+    // layout-space top-left is sourceRect.left/top (Flutter un-transforms
+    // pointer coordinates through the viewport's Transform for us).
+    final position = Offset(
+      drag.sourceRect.left + localPosition.dx,
+      drag.sourceRect.top + localPosition.dy,
+    );
+    final target = resolveDropTarget<T>(
+      state: widget.controller.state,
+      dragged: drag.node,
+      point: (x: position.dx, y: position.dy),
+      canReparent: widget.canReparent,
+    );
+    setState(() {
+      _drag = drag.copyWith(
+        position: position,
+        targetId: target?.id,
+        clearTarget: target == null,
+      );
+    });
+  }
+
+  void _endDrag() {
+    final drag = _drag;
+    if (drag == null || _snapBack.isAnimating) return;
+    final targetId = drag.targetId;
+    final target = targetId == null
+        ? null
+        : widget.controller.nodeById(targetId);
+    if (target != null) {
+      setState(() => _drag = null);
+      widget.onReparent?.call(drag.node, target);
+    } else {
+      // Invalid drop: snap the ghost back to where the node lives.
+      _snapFrom = drag.ghostTopLeft;
+      _snapBack.forward(from: 0);
+    }
+  }
+
+  /// Cancels without snap-back: used when the world changes under the
+  /// drag (relayout, controller swap, programmatic viewport move) and the
+  /// frozen coordinates can no longer be trusted.
+  void _cancelDrag() {
+    if (_drag == null) return;
+    _snapBack.stop();
+    setState(() {
+      _drag = null;
+      _snapFrom = null;
+    });
+  }
+
+  /// Ghost top-left in layout space: follows the pointer during the drag,
+  /// lerps back to the node's own rect while the snap-back plays.
+  Offset get _ghostTopLeft {
+    final drag = _drag!;
+    final from = _snapFrom;
+    if (from == null || !_snapBack.isAnimating && _snapBack.value == 0) {
+      return drag.ghostTopLeft;
+    }
+    final t = Curves.easeOut.transform(_snapBack.value);
+    final home = Offset(drag.sourceRect.left, drag.sourceRect.top);
+    return Offset.lerp(from, home, t)!;
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -560,6 +715,12 @@ class _OrgChartState<T> extends State<OrgChart<T>>
       builder: (context, _) {
         final merged = _mergedNodes();
         final t = _layoutAnim.isAnimating ? _t.value : 1.0;
+        // Computed here, before the children list, so the drop-target
+        // Positioned below can be a direct Stack child (see the comment at
+        // its use site).
+        final dragTargetLayout = (_drag?.targetId) == null
+            ? null
+            : _animNext.byId(_drag!.targetId!);
         final children = <Widget>[
           Positioned.fill(
             child: CustomPaint(
@@ -605,11 +766,23 @@ class _OrgChartState<T> extends State<OrgChart<T>>
               child: IgnorePointer(
                 ignoring: n.exiting,
                 child: Opacity(
-                  opacity: n.opacity.clamp(0.0, 1.0),
+                  opacity:
+                      (_drag != null && _drag!.node.id == n.node.id
+                              ? 0.4
+                              : n.opacity)
+                          .clamp(0.0, 1.0),
                   child: GestureDetector(
                     onTap: widget.onNodeTap == null
                         ? null
                         : () => widget.onNodeTap!(n.node),
+                    onLongPressStart: !_dragEnabled
+                        ? null
+                        : (d) => _startDrag(n.node, n.rect, d.localPosition),
+                    onLongPressMoveUpdate: !_dragEnabled
+                        ? null
+                        : (d) => _updateDrag(d.localPosition),
+                    onLongPressEnd: !_dragEnabled ? null : (_) => _endDrag(),
+                    onLongPressCancel: !_dragEnabled ? null : _cancelDrag,
                     child: widget.nodeBuilder(context, n.node),
                   ),
                 ),
@@ -635,6 +808,49 @@ class _OrgChartState<T> extends State<OrgChart<T>>
                 ),
               ),
           ],
+          // Drop-target overlay and drag ghost (Task 4). `dragTargetLayout`
+          // is computed before the children list so the resulting
+          // `Positioned` can be a direct Stack child — Positioned must be
+          // the outermost widget for Stack to apply its offset/size, so it
+          // cannot be produced from inside a Builder here.
+          if (dragTargetLayout != null)
+            Positioned(
+              key: ValueKey('drop-target-${_drag!.targetId}'),
+              left: dragTargetLayout.rect.left + origin.dx,
+              top: dragTargetLayout.rect.top + origin.dy,
+              width: dragTargetLayout.rect.width,
+              height: dragTargetLayout.rect.height,
+              child: IgnorePointer(
+                child:
+                    widget.dropTargetBuilder?.call(
+                      context,
+                      dragTargetLayout.node,
+                    ) ??
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: widget.highlightedLinkStyle.color,
+                          width: 3,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+              ),
+            ),
+          if (_drag != null)
+            Positioned(
+              key: const ValueKey('drag-ghost'),
+              left: _ghostTopLeft.dx + origin.dx,
+              top: _ghostTopLeft.dy + origin.dy,
+              width: _drag!.sourceRect.width,
+              height: _drag!.sourceRect.height,
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.7,
+                  child: widget.nodeBuilder(context, _drag!.node),
+                ),
+              ),
+            ),
         ];
         return Stack(clipBehavior: Clip.none, children: children);
       },
@@ -685,6 +901,10 @@ class _OrgChartState<T> extends State<OrgChart<T>>
           // ticking and fight the gesture (stop() fires the tween's
           // whenCompleteOrCancel, detaching its tick listener).
           onInteractionStart: () => _viewportAnim.stop(),
+          // Suppressed while a drag is in flight: a second pointer panning
+          // or pinching would invalidate the drag's frozen coordinate
+          // transform (see ChartViewport.enabled's own doc).
+          enabled: _drag == null,
           child: content,
         );
       },

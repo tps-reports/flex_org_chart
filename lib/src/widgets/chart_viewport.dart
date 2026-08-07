@@ -64,6 +64,24 @@ class _ChartViewportState extends State<ChartViewport> {
   Matrix4? _gestureStart;
   Offset? _focalStart;
 
+  // Local position of the most recent single-pointer down, tracked via the
+  // raw Listener below rather than the gesture-arena/recognizer machinery.
+  // Needed because ScaleGestureRecognizer.onStart's own
+  // `details.localFocalPoint` is only trustworthy as a gesture-start anchor
+  // when Scale wins its arena at pointer-down. If this viewport's Scale
+  // recognizer instead competes against a sibling recognizer that only
+  // rejects once the pointer has moved past its own slop (e.g. a node's
+  // long-press when drag-to-reparent is enabled — see OrgChart), the arena
+  // doesn't resolve until that same move event, and Scale's onStart fires
+  // using its *already-updated* (post-move) focal point — onStart and the
+  // paired first onUpdate then report the identical position, silently
+  // eating that whole first movement. Anchoring to the raw down position
+  // instead sidesteps arena-resolution timing entirely. Only applied for
+  // single-pointer gestures (see onScaleStart) — a multi-finger pinch's
+  // focal point is an average of every contact, which one pointer's down
+  // position can't stand in for.
+  Offset? _rawPointerDownLocal;
+
   TransformationController get _tc => widget.transformationController;
 
   double get _minScale => widget.scaleExtent.$1;
@@ -121,6 +139,13 @@ class _ChartViewportState extends State<ChartViewport> {
   @override
   Widget build(BuildContext context) {
     return Listener(
+      // Tracked independently of the gesture arena purely to recover the
+      // true down position for onScaleStart's anchor — see
+      // _rawPointerDownLocal's doc comment. Does not itself participate in
+      // hit-testing/arena resolution.
+      onPointerDown: (event) => _rawPointerDownLocal = event.localPosition,
+      onPointerUp: (_) => _rawPointerDownLocal = null,
+      onPointerCancel: (_) => _rawPointerDownLocal = null,
       onPointerSignal: (event) {
         if (!widget.enabled) return;
         if (event is PointerScrollEvent) {
@@ -139,7 +164,9 @@ class _ChartViewportState extends State<ChartViewport> {
           // matrix that nothing else is about to overwrite.
           widget.onInteractionStart?.call();
           _gestureStart = _tc.value.clone();
-          _focalStart = details.localFocalPoint;
+          _focalStart = details.pointerCount == 1
+              ? (_rawPointerDownLocal ?? details.localFocalPoint)
+              : details.localFocalPoint;
         },
         onScaleUpdate: (details) {
           if (!widget.enabled) return;
