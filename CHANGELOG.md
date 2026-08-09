@@ -1,3 +1,14 @@
+## 0.4.1
+
+- **Fixed package archive bloat**: 0.4.0's archive accidentally included
+  build caches and stale generated dartdoc (~30 MB) — a root `.pubignore`
+  replaces `.gitignore` for packaging, and ours listed only the internal
+  docs directory. The `.pubignore` now mirrors the repo's ignores; the
+  archive is back to sources, README, and the example. Prefer 0.4.1 over
+  0.4.0 (identical code).
+- README install snippet updated to the current version (it still said
+  `^0.1.0`).
+
 ## 0.4.0
 
 - **Department bounding boxes**: declare `groups:

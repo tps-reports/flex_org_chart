@@ -13,7 +13,7 @@ highlighting, and independent connection overlays. Ported from
 
 ```yaml
 dependencies:
-  flex_org_chart: ^0.1.0
+  flex_org_chart: ^0.4.1
 ```
 
 ## Quickstart

@@ -1,3 +1,32 @@
-# Internal design specs and implementation plans — repo history, not
-# package documentation (which lives in doc/ and README.md).
+# A root .pubignore REPLACES the root .gitignore for packaging decisions,
+# so this must mirror .gitignore's exclusions and add package-only ones.
+# (0.4.0 shipped with only `docs/` here — and dragged build caches and
+# stale generated dartdoc into a 30 MB archive. See CHANGELOG 0.4.1.)
+
+# Package-only exclusions
 docs/
+doc/api/
+
+# Mirrored from .gitignore
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+migrate_working_dir/
+*.iml
+*.ipr
+*.iws
+.idea/
+pubspec.lock
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+coverage/
+logs/
+.superpowers/
+.claude/
