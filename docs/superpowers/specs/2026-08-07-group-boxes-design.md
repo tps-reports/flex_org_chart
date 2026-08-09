@@ -1,5 +1,13 @@
 # Department bounding boxes — design
 
+> **Post-plan refinements:** three contracts below were superseded at plan
+> time (see the plan's header): dash validation happens at paint time with
+> a solid fallback (const constructors cannot validate — matching
+> `ConnectionStyle`, whose behavior this spec mis-stated); `ChartGroup`
+> uses instance identity, not value equality (matching `Connection`); and
+> `computeGroupHulls` takes a `nodeById` callback rather than a tree
+> parameter.
+
 Feature #3 of the roadmap (README row: "Department bounding boxes (group
 nodes by subtree)"). Draws a styled, labeled box behind each declared
 subtree ("department"), animating with the chart. No d3-org-chart

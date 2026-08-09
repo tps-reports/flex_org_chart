@@ -168,7 +168,9 @@ class OrgChart<T> extends StatefulWidget {
   /// Default style for department bounding boxes declared via
   /// [OrgChartController.groups]. A [ChartGroup.style] overrides this
   /// per group. Boxes are painted beneath links and nodes and animate
-  /// with layout changes.
+  /// with layout changes. During a drag-to-reparent, a dragged member's
+  /// box stays anchored to the node's home position — the floating ghost
+  /// never stretches its group's hull.
   final GroupBoxStyle groupBoxStyle;
 
   @override
@@ -761,22 +763,25 @@ class _OrgChartState<T> extends State<OrgChart<T>>
         // Hulls from the SAME merged (lerped) rects the nodes render at,
         // so boxes stretch/glide with layout animations — including
         // shrinking as exiting members retreat during a collapse.
-        final groupHulls = computeGroupHulls<T>(
-          groups: controller.groups,
-          memberRects: {for (final n in merged) n.node.id: n.rect},
-          nodeById: controller.nodeById,
-          paddingOf: (g) => (g.style ?? widget.groupBoxStyle).padding,
-        );
+        final groupHulls = controller.groups.isEmpty
+            ? const <GroupHull>[]
+            : computeGroupHulls<T>(
+                groups: controller.groups,
+                memberRects: {for (final n in merged) n.node.id: n.rect},
+                nodeById: controller.nodeById,
+                paddingOf: (g) => (g.style ?? widget.groupBoxStyle).padding,
+              );
         final children = <Widget>[
-          Positioned.fill(
-            child: CustomPaint(
-              painter: GroupBoxPainter(
-                hulls: groupHulls,
-                defaultStyle: widget.groupBoxStyle,
-                origin: origin,
+          if (controller.groups.isNotEmpty)
+            Positioned.fill(
+              child: CustomPaint(
+                painter: GroupBoxPainter(
+                  hulls: groupHulls,
+                  defaultStyle: widget.groupBoxStyle,
+                  origin: origin,
+                ),
               ),
             ),
-          ),
           Positioned.fill(
             child: CustomPaint(
               painter: EdgePainter(

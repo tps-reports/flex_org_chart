@@ -366,5 +366,22 @@ void main() {
       final p = painterOf(tester);
       expect(p.styleFor(p.hulls.single), override);
     });
+
+    testWidgets('dashed group style renders without error', (tester) async {
+      final c = makeChart(
+        groups: const [
+          ChartGroup(
+            rootId: 'c',
+            label: 'Dashed',
+            style: GroupBoxStyle(dash: [8, 6]),
+          ),
+        ],
+      );
+      await tester.pumpWidget(app(c));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      final p = painterOf(tester);
+      expect(p.hulls, hasLength(1));
+    });
   });
 }
