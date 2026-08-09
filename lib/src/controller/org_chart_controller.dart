@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../layout/layout_engine.dart';
 import '../layout/layout_orientation.dart';
 import '../layout/stratify.dart';
+import '../model/chart_group.dart';
 import '../model/chart_state.dart';
 import '../model/connection.dart';
 import '../model/geometry.dart';
@@ -71,11 +72,12 @@ abstract class ChartViewportHandle {
 class OrgChartController<T> extends ChangeNotifier {
   /// Creates a controller over [data]. [idOf] and [parentIdOf] resolve each
   /// item's id and parent id (a `null`/empty parent id makes an item a
-  /// root); nodes at [initialExpandLevel] or shallower start expanded; and
+  /// root); nodes at [initialExpandLevel] or shallower start expanded;
   /// [connections] declares any non-hierarchical links to draw alongside
-  /// the tree. [onDataChanged] fires after every successful editing op with
-  /// the new backing data — wire it to persistence. [withParent] is
-  /// required by [reparent] and by [removeNode]'s child promotion;
+  /// the tree; and [groups] declares department bounding boxes drawn
+  /// behind subtrees. [onDataChanged] fires after every successful editing
+  /// op with the new backing data — wire it to persistence. [withParent]
+  /// is required by [reparent] and by [removeNode]'s child promotion;
   /// leaf-only editing (no reparenting, no removing a node with children)
   /// can omit it.
   OrgChartController({
@@ -84,10 +86,12 @@ class OrgChartController<T> extends ChangeNotifier {
     required this.parentIdOf,
     this.initialExpandLevel = 1,
     List<Connection> connections = const [],
+    List<ChartGroup> groups = const [],
     this.onDataChanged,
     this.withParent,
   }) : _data = List.of(data),
-       _connections = List.of(connections);
+       _connections = List.of(connections),
+       _groups = List.of(groups);
 
   /// Resolves a data item's unique id.
   final String Function(T) idOf;
@@ -115,6 +119,7 @@ class OrgChartController<T> extends ChangeNotifier {
 
   List<T> _data;
   final List<Connection> _connections;
+  final List<ChartGroup> _groups;
   OrgTree<T>? _tree;
   OrgChartConfig<T>? _config;
   ChartViewportHandle? _viewport;
@@ -139,6 +144,11 @@ class OrgChartController<T> extends ChangeNotifier {
   /// The declared non-hierarchical connections, as passed to the
   /// constructor.
   List<Connection> get connections => List.unmodifiable(_connections);
+
+  /// The declared department groups, as passed to the constructor. Each
+  /// is drawn as a bounding box behind its root node and visible
+  /// descendants — see `ChartGroup`.
+  List<ChartGroup> get groups => List.unmodifiable(_groups);
 
   /// The controller's current backing data, including the result of any
   /// editing ops ([addNode], [removeNode], [reparent], [updateNode]), as

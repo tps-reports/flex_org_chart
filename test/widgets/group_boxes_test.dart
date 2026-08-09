@@ -262,4 +262,109 @@ void main() {
       expect(same.shouldRepaint(a), isTrue);
     });
   });
+
+  group('OrgChart group boxes', () {
+    OrgChartController<R> makeChart({List<ChartGroup> groups = const []}) =>
+        OrgChartController<R>(
+          data: const [
+            (id: 'a', parentId: null),
+            (id: 'b', parentId: 'a'),
+            (id: 'c', parentId: 'a'),
+            (id: 'd', parentId: 'c'),
+          ],
+          idOf: (r) => r.id,
+          parentIdOf: (r) => r.parentId,
+          initialExpandLevel: 2,
+          groups: groups,
+        );
+
+    Widget app(OrgChartController<R> c, {GroupBoxStyle? style}) => MaterialApp(
+      home: Scaffold(
+        body: OrgChart<R>(
+          controller: c,
+          compact: false,
+          nodeSize: (_) => (w: 100, h: 50),
+          groupBoxStyle: style ?? const GroupBoxStyle(),
+          nodeBuilder: (context, node) =>
+              Text('node-${node.id}', key: ValueKey('node-${node.id}')),
+        ),
+      ),
+    );
+
+    GroupBoxPainter painterOf(WidgetTester tester) {
+      final paints = tester
+          .widgetList<CustomPaint>(find.byType(CustomPaint))
+          .where((p) => p.painter is GroupBoxPainter);
+      return paints.single.painter! as GroupBoxPainter;
+    }
+
+    testWidgets('declared group renders one hull, painted beneath nodes', (
+      tester,
+    ) async {
+      final c = makeChart(
+        groups: const [ChartGroup(rootId: 'c', label: 'C-team')],
+      );
+      await tester.pumpWidget(app(c));
+      await tester.pumpAndSettle();
+      final p = painterOf(tester);
+      expect(p.hulls, hasLength(1));
+      expect(p.hulls.single.group.rootId, 'c');
+      // Bottom-most: the group-box CustomPaint is the first child of the
+      // animated layer's Stack.
+      final stack = tester.widget<Stack>(
+        find
+            .ancestor(
+              of: find.byWidget(
+                tester
+                    .widgetList<CustomPaint>(find.byType(CustomPaint))
+                    .firstWhere((w) => w.painter is GroupBoxPainter),
+              ),
+              matching: find.byType(Stack),
+            )
+            .first,
+      );
+      expect(
+        ((stack.children.first as Positioned).child as CustomPaint).painter,
+        isA<GroupBoxPainter>(),
+      );
+    });
+
+    testWidgets('collapsing the root ancestor removes the hull', (
+      tester,
+    ) async {
+      final c = makeChart(groups: const [ChartGroup(rootId: 'c')]);
+      await tester.pumpWidget(app(c));
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).hulls, hasLength(1));
+      c.collapse('a'); // c hidden behind collapsed a
+      await tester.pumpAndSettle();
+      expect(painterOf(tester).hulls, isEmpty);
+    });
+
+    testWidgets('hull shrinks when collapsing inside the group', (
+      tester,
+    ) async {
+      final c = makeChart(groups: const [ChartGroup(rootId: 'c')]);
+      await tester.pumpWidget(app(c));
+      await tester.pumpAndSettle();
+      final before = painterOf(tester).hulls.single.rect.height;
+      c.collapse('c'); // d leaves; box should end at root-only height
+      await tester.pumpAndSettle();
+      final after = painterOf(tester).hulls.single.rect.height;
+      expect(after, lessThan(before));
+    });
+
+    testWidgets('per-group style override wins over the widget default', (
+      tester,
+    ) async {
+      const override = GroupBoxStyle(borderColor: Color(0xFFAA0000));
+      final c = makeChart(
+        groups: const [ChartGroup(rootId: 'c', style: override)],
+      );
+      await tester.pumpWidget(app(c));
+      await tester.pumpAndSettle();
+      final p = painterOf(tester);
+      expect(p.styleFor(p.hulls.single), override);
+    });
+  });
 }

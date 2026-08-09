@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show HapticFeedback;
 import '../controller/org_chart_controller.dart';
 import '../layout/layout_engine.dart';
 import '../layout/layout_orientation.dart';
+import '../model/chart_group.dart';
 import '../model/chart_state.dart';
 import '../model/geometry.dart';
 import '../model/org_chart_data_exception.dart';
@@ -13,6 +14,8 @@ import 'connection_painter.dart';
 import 'drag_reparent.dart';
 import 'edge_painter.dart';
 import 'expand_button.dart';
+import 'group_box_painter.dart';
+import 'group_hulls.dart';
 import 'viewport_math.dart';
 
 /// Builds the widget shown for a single visible node.
@@ -56,6 +59,7 @@ class OrgChart<T> extends StatefulWidget {
     this.onReparent,
     this.canReparent,
     this.dropTargetBuilder,
+    this.groupBoxStyle = const GroupBoxStyle(),
   });
 
   /// Owns the chart's data and derived layout. Must be configured by this
@@ -160,6 +164,12 @@ class OrgChart<T> extends StatefulWidget {
   /// [highlightedLinkStyle]'s color. Only consulted when [onReparent] is
   /// non-null.
   final Widget Function(BuildContext, OrgNode<T>)? dropTargetBuilder;
+
+  /// Default style for department bounding boxes declared via
+  /// [OrgChartController.groups]. A [ChartGroup.style] overrides this
+  /// per group. Boxes are painted beneath links and nodes and animate
+  /// with layout changes.
+  final GroupBoxStyle groupBoxStyle;
 
   @override
   State<OrgChart<T>> createState() => _OrgChartState<T>();
@@ -748,7 +758,25 @@ class _OrgChartState<T> extends State<OrgChart<T>>
         final dragTargetLayout = (_drag?.targetId) == null
             ? null
             : _animNext.byId(_drag!.targetId!);
+        // Hulls from the SAME merged (lerped) rects the nodes render at,
+        // so boxes stretch/glide with layout animations — including
+        // shrinking as exiting members retreat during a collapse.
+        final groupHulls = computeGroupHulls<T>(
+          groups: controller.groups,
+          memberRects: {for (final n in merged) n.node.id: n.rect},
+          nodeById: controller.nodeById,
+          paddingOf: (g) => (g.style ?? widget.groupBoxStyle).padding,
+        );
         final children = <Widget>[
+          Positioned.fill(
+            child: CustomPaint(
+              painter: GroupBoxPainter(
+                hulls: groupHulls,
+                defaultStyle: widget.groupBoxStyle,
+                origin: origin,
+              ),
+            ),
+          ),
           Positioned.fill(
             child: CustomPaint(
               painter: EdgePainter(
