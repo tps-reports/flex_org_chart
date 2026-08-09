@@ -1,8 +1,8 @@
 name: flex_org_chart
 description: >-
-  Highly customizable, animated org chart widget for Flutter: pan/zoom,
-  compact flextree layout, highlighting, and connections. Ported from
-  d3-org-chart.
+  Animated, customizable org chart for Flutter: compact flextree layout,
+  pan/zoom, drag-and-drop re-parenting, node editing, department boxes,
+  connections. Ported from d3-org-chart.
 version: 0.4.0
 repository: https://github.com/tps-reports/flex_org_chart
 topics:

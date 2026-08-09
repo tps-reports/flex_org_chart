@@ -1,0 +1,3 @@
+# Internal design specs and implementation plans — repo history, not
+# package documentation (which lives in doc/ and README.md).
+docs/
