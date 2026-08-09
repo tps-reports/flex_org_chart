@@ -1,3 +1,17 @@
+## 0.4.0
+
+- **Department bounding boxes**: declare `groups:
+  [ChartGroup(rootId: ..., label: ..., style: ...)]` on the controller
+  and a labeled, styled box is painted behind that node and its visible
+  descendants — beneath links and nodes, animating with layout changes
+  (including shrinking as a collapsing department's members retreat).
+  Styled via `GroupBoxStyle` (fill, border, corner radius, padding,
+  label style, optional dash) with per-group overrides; nested groups
+  paint outer-first. No d3-org-chart equivalent.
+- Internal: the dash-walk (with its invalid-pattern solid-line guard) is
+  now shared between `ConnectionPainter` and the new `GroupBoxPainter`
+  as `dashedPath`.
+
 ## 0.3.0
 
 - **Node editing API**: `addNode`, `removeNode` (children promote to the

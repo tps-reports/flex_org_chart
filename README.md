@@ -98,6 +98,26 @@ controller.removeNode('4');           // children promote to the grandparent
 controller.updateNode(renamedPerson); // same id, new payload
 ```
 
+Department bounding boxes draw a labeled box behind any subtree — declare
+groups on the controller, style them on the widget (or per group):
+
+```dart
+OrgChartController<Employee>(
+  data: employees,
+  idOf: (e) => e.id,
+  parentIdOf: (e) => e.managerId,
+  groups: [
+    ChartGroup(rootId: '3', label: 'Engineering'),
+    ChartGroup(rootId: '7', label: 'Design',
+        style: GroupBoxStyle(dash: [8, 6])),
+  ],
+);
+```
+
+Boxes wrap the root and its currently visible descendants, shrink and
+grow as you collapse/expand within the department, and animate with
+every layout change. d3-org-chart has no equivalent.
+
 ## Features
 
 | Feature | flex_org_chart | d3-org-chart |
@@ -115,7 +135,7 @@ controller.updateNode(renamedPerson); // same id, new payload
 | Data validation (cycles, missing parents, dup ids) | done (`OrgChartDataException`) | partial (throws generic errors) |
 | Drag-and-drop re-parenting | done (long-press to lift) | done |
 | Node editing (add/remove/re-parent via API) | done | done |
-| Department bounding boxes (group nodes by subtree) | roadmap | — |
+| Department bounding boxes (group nodes by subtree) | done | — |
 | Image / PDF export | roadmap | done |
 
 Rows marked **roadmap** are **not implemented** in this release — there is no

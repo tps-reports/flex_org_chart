@@ -90,6 +90,23 @@ class _DemoAppState extends State<DemoApp> {
       Connection(from: '7', to: '8', label: 'shared ledger'),
       Connection(from: '5', to: '17', label: 'infra pairing'),
     ],
+    // Department bounding boxes: labeled boxes drawn behind a subtree's
+    // currently visible members. Rooted at mid-level managers (not the
+    // CEO), so each box wraps one department rather than the whole chart.
+    groups: const [
+      // VP Engineering's seven-person subtree — the same leaf-heavy team
+      // compact mode folds into two columns underneath her.
+      ChartGroup(rootId: '5', label: 'Engineering'),
+      ChartGroup(
+        rootId: '9',
+        label: 'Operations',
+        style: GroupBoxStyle(
+          borderColor: Color(0xFF7C4DFF),
+          fill: Color(0x117C4DFF),
+          dash: [8, 6],
+        ),
+      ),
+    ],
     withParent: (e, newManagerId) =>
         Employee(e.id, newManagerId, e.name, e.title),
     onDataChanged: (data) => _employees = List.of(data),
